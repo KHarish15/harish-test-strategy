@@ -108,7 +108,7 @@ const ImageInsights: React.FC<ImageInsightsProps> = ({ onClose, onFeatureSelect,
     { id: 'code' as const, label: 'Code Assistant', icon: Code },
     { id: 'impact' as const, label: 'Impact Analyzer', icon: TrendingUp },
     { id: 'test' as const, label: 'Test Support Tool', icon: TestTube },
-    { id: 'image' as const, label: 'Image Insights & Chart Builder', icon: Image },
+    { id: 'diagram' as const, label: 'Image Insights & Chart Builder', icon: Image },
   ];
 
 
@@ -512,15 +512,16 @@ ${JSON.stringify(chartData.data, null, 2)}
           </div>
           {/* Feature Navigation */}
           {onFeatureSelect && (
-            <div className="mt-6 flex gap-2">
+            <div className="mt-6 flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
               {features.map((feature) => {
                 const Icon = feature.icon;
-                const isActive = feature.id === 'image';
+                // Fix: Use 'diagram' as the id for the chart/insight feature to match FeatureType
+                const isActive = feature.id === 'diagram';
                 return (
                   <button
                     key={feature.id}
-                    onClick={() => onFeatureSelect(feature.id)}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg backdrop-blur-sm border transition-all duration-200 whitespace-nowrap ${
+                    onClick={() => onFeatureSelect(feature.id as any)}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg backdrop-blur-sm border transition-all duration-200 whitespace-nowrap min-w-max ${
                       isActive
                         ? 'bg-white/90 text-confluence-blue shadow-lg border-white/30'
                         : 'bg-white/10 text-white hover:bg-white/20 border-white/10'
