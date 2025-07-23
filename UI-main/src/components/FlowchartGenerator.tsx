@@ -73,4 +73,4 @@ const FlowchartGenerator: React.FC = () => {
   );
 };
 
-export default FlowchartGenerator; 
+export default FlowchartGenerator;

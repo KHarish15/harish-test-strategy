@@ -6,12 +6,12 @@ import VideoSummarizer from './components/VideoSummarizer';
 import CodeAssistant from './components/CodeAssistant';
 import ImpactAnalyzer from './components/ImpactAnalyzer';
 import TestSupportTool from './components/TestSupportTool';
-import ImageInsights from './components/ImageInsights';
+import DiagramTools from './components/DiagramTools';
 import CircularLauncher from './components/CircularLauncher';
 import FlowchartGenerator from './components/FlowchartGenerator';
 import axios from "axios";
 
-export type FeatureType = 'search' | 'video' | 'code' | 'impact' | 'test' | 'image' | 'flowchart' | null;
+export type FeatureType = 'search' | 'video' | 'code' | 'impact' | 'test' | 'diagram' | null;
 export type AppMode = 'agent' | 'tool' | null;
 
 export async function generateFlowchart(spaceKey: string, pageTitle: string, apiKey?: string) {
@@ -55,10 +55,8 @@ function App() {
         return <ImpactAnalyzer onClose={() => setActiveFeature(null)} onFeatureSelect={setActiveFeature} autoSpaceKey={autoSpaceKey} isSpaceAutoConnected={!!autoSpaceKey} />;
       case 'test':
         return <TestSupportTool onClose={() => setActiveFeature(null)} onFeatureSelect={setActiveFeature} autoSpaceKey={autoSpaceKey} isSpaceAutoConnected={!!autoSpaceKey} />;
-      case 'image':
-        return <ImageInsights onClose={() => setActiveFeature(null)} onFeatureSelect={setActiveFeature} autoSpaceKey={autoSpaceKey} isSpaceAutoConnected={!!autoSpaceKey} />;
-      case 'flowchart':
-        return <FlowchartGenerator />;
+      case 'diagram':
+        return <DiagramTools />;
       default:
         return <AIPoweredSearch onClose={() => setActiveFeature(null)} onFeatureSelect={setActiveFeature} autoSpaceKey={autoSpaceKey} isSpaceAutoConnected={!!autoSpaceKey} />;
     }
@@ -96,8 +94,7 @@ function App() {
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('code')}>Code Assistant</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('impact')}>Impact Analyzer</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('test')}>Test Support Tool</button>
-            <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('image')}>Image Insights</button>
-            <button className="min-w-max bg-blue-500 text-white px-3 py-1 rounded" onClick={() => setActiveFeature('flowchart')}>Flowchart Generator</button>
+            <button className="min-w-max bg-blue-500 text-white px-3 py-1 rounded" onClick={() => setActiveFeature('diagram')}>Diagram Tools</button>
           </div>
           {!appMode ? (
             <ModeSelector onModeSelect={handleModeSelect} onClose={handleAppClose} />
