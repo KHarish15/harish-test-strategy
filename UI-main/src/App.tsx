@@ -95,9 +95,9 @@ function App() {
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('video')}>Video Summarizer</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('code')}>Code Assistant</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('impact')}>Impact Analyzer</button>
+            <button className="min-w-max bg-blue-500 text-white px-3 py-1 rounded" onClick={() => setActiveFeature('flowchart')}>Flowchart Generator</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('test')}>Test Support Tool</button>
             <button className="min-w-max bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('image')}>Image Insights</button>
-            <button className="min-w-max bg-blue-500 text-white px-3 py-1 rounded" onClick={() => setActiveFeature('flowchart')}>Flowchart Generator</button>
           </div>
           {!appMode ? (
             <ModeSelector onModeSelect={handleModeSelect} onClose={handleAppClose} />
