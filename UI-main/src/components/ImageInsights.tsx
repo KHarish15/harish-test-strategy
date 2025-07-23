@@ -515,8 +515,8 @@ ${JSON.stringify(chartData.data, null, 2)}
           {/* Feature Navigation */}
           {onFeatureSelect && (
             <div
-              className="mt-6 flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2"
-              style={{ WebkitOverflowScrolling: 'touch', maxWidth: '100vw' }}
+              className="mt-6 w-full flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2 border-b border-gray-200"
+              style={{ WebkitOverflowScrolling: 'touch', minWidth: 0 }}
             >
               {features.map((feature) => {
                 const Icon = feature.icon;
