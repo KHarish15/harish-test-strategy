@@ -77,17 +77,19 @@ const ImageInsights: React.FC<ImageInsightsProps> = ({ onClose, onFeatureSelect,
   // Load pages when space key changes
   useEffect(() => {
     const loadPages = async () => {
-      if (!spaceKey) {
+      if (!spaceKey || spaceKey === 'null' || spaceKey === 'undefined') {
         setPages([]);
+        console.warn('No valid spaceKey provided to loadPages:', spaceKey);
         return;
       }
       setIsLoadingPages(true);
       try {
         const response = await apiService.getPages(spaceKey);
         setPages(response.pages);
-      } catch (error) {
-        console.error('Failed to load pages:', error);
+      } catch (error: any) {
+        console.error('Failed to load pages for spaceKey', spaceKey, error);
         setPages([]);
+        // Optionally, you can set an error state here to show a user-friendly message
       } finally {
         setIsLoadingPages(false);
       }
