@@ -514,7 +514,10 @@ ${JSON.stringify(chartData.data, null, 2)}
           </div>
           {/* Feature Navigation */}
           {onFeatureSelect && (
-            <div className="mt-6 flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div
+              className="mt-6 flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2"
+              style={{ WebkitOverflowScrolling: 'touch', maxWidth: '100vw' }}
+            >
               {features.map((feature) => {
                 const Icon = feature.icon;
                 // Fix: Use 'diagram' as the id for the chart/insight feature to match FeatureType
