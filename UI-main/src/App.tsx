@@ -90,7 +90,7 @@ function App() {
       {isAppOpen && (
         <div>
           {/* Add a simple navigation bar for feature selection */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex overflow-x-auto gap-2 mb-4 whitespace-nowrap">
             <button className="bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('search')}>AI Powered Search</button>
             <button className="bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('video')}>Video Summarizer</button>
             <button className="bg-gray-200 px-3 py-1 rounded" onClick={() => setActiveFeature('code')}>Code Assistant</button>
