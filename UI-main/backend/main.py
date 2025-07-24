@@ -24,6 +24,7 @@ import base64
 from datetime import datetime
 from flowchart_generator import generate_flowchart_image
 from jira_utils import create_jira_issue
+from slack_utils import send_slack_message
 
 # Load environment variables
 load_dotenv()
@@ -710,9 +711,27 @@ Answer:"""
                 jira_result = create_jira_issue(summary, description)
                 print(f"Jira issue created: {jira_result}")
                 result["jira_issue"] = jira_result.get("key")
+                jira_url = None
+                if jira_result.get("key"):
+                    jira_url = f"{os.getenv('JIRA_BASE_URL')}/browse/{jira_result['key']}"
             except Exception as jira_exc:
                 print(f"Jira issue creation failed: {jira_exc}")
                 result["jira_error"] = str(jira_exc)
+                jira_url = None
+            # Send Slack notification
+            try:
+                slack_message = (
+                    "*High Risk Change Detected!*\n"
+                    f"*Pages:* {request.old_page_title} → {request.new_page_title}\n"
+                    f"*Risk Level:* HIGH\n"
+                    f"*Summary:* {impact_text[:200]}...\n"
+                    + (f"*Jira Ticket:* <{jira_url}|{jira_result.get('key')}>\n" if jira_url else "")
+                )
+                send_slack_message(slack_message)
+                print("Slack notification sent.")
+            except Exception as slack_exc:
+                print(f"Slack notification failed: {slack_exc}")
+                result["slack_error"] = str(slack_exc)
 
         return result
         
