@@ -20,7 +20,7 @@ const FlowchartGenerator: React.FC = () => {
       try {
         const response = await apiService.getSpaces();
         setSpaces(response.spaces);
-        console.log("[FlowchartGenerator] Fetched spaces:", response.spaces); // DEBUG
+        console.log("Spaces loaded:", response.spaces); // Debug log
       } catch (err) {
         setError("Failed to load spaces. Please check your backend connection.");
         console.error("[FlowchartGenerator] Error fetching spaces:", err); // DEBUG
