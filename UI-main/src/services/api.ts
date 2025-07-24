@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://finalproject-75ss.onrender.com';
+const API_BASE_URL = 'https://backend-az2r.onrender.com';
 
 export interface SearchRequest {
   space_key: string;
