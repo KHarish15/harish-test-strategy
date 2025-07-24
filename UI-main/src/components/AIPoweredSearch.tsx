@@ -179,7 +179,7 @@ const AIPoweredSearch: React.FC<AIPoweredSearchProps> = ({
           </div>
           
           {/* Feature Navigation */}
-          <div className="mt-6 flex gap-2">
+          <div className="mt-6 flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-blue-50" style={{ WebkitOverflowScrolling: 'touch' }}>
             {features.map((feature) => {
               const Icon = feature.icon;
               const isActive = feature.id === 'search';
