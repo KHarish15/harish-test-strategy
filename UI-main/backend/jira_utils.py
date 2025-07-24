@@ -28,7 +28,18 @@ def create_jira_issue(summary, description, issue_type="Task"):
         "fields": {
             "project": {"key": project_key},
             "summary": summary,
-            "description": description,
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {"type": "text", "text": description}
+                        ]
+                    }
+                ]
+            },
             "issuetype": {"name": issue_type}
         }
     }
