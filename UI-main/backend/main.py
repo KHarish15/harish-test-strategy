@@ -1286,6 +1286,8 @@ async def flowchart_generator(space_key: Optional[str] = Body(None), page_title:
         img_base64 = base64.b64encode(img_bytes).decode()
         return {"image_base64": img_base64, "mime_type": "image/png", "filename": f"{page_title}_flowchart.png"}
     except Exception as e:
+        print("Error in /flowchart-generator:", str(e))
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/test")
