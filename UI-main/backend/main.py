@@ -23,6 +23,7 @@ import difflib
 import base64
 from datetime import datetime
 from flowchart_generator import generate_flowchart_image
+from jira_utils import create_jira_issue
 
 # Load environment variables
 load_dotenv()
@@ -680,7 +681,7 @@ Answer:"""
             qa_answer = qa_response.text.strip()
             
         
-        return {
+        result = {
             "lines_added": lines_added,
             "lines_removed": lines_removed,
             "files_changed": 1,
@@ -694,6 +695,23 @@ Answer:"""
             "answer": qa_answer,
             "diff": full_diff_text
         }
+
+        # Agentic Jira integration: create ticket if risk is high
+        if result["risk_level"] == "high":
+            try:
+                summary = f"High Risk Change Detected: {request.old_page_title} → {request.new_page_title}"
+                description = (
+                    f"Impact Analysis:\n{impact_text}\n\n"
+                    f"Recommendations:\n{rec_text}\n\n"
+                    f"Risk Analysis:\n{risk_text}\n\n"
+                    f"Diff:\n{full_diff_text[:1000]}..."  # Truncate if too long
+                )
+                jira_result = create_jira_issue(summary, description)
+                result["jira_issue"] = jira_result.get("key")
+            except Exception as jira_exc:
+                result["jira_error"] = str(jira_exc)
+
+        return result
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
