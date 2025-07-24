@@ -699,6 +699,7 @@ Answer:"""
         # Agentic Jira integration: create ticket if risk is high
         if result["risk_level"] == "high":
             try:
+                print("Attempting to create Jira issue for high risk...")
                 summary = f"High Risk Change Detected: {request.old_page_title} → {request.new_page_title}"
                 description = (
                     f"Impact Analysis:\n{impact_text}\n\n"
@@ -707,8 +708,10 @@ Answer:"""
                     f"Diff:\n{full_diff_text[:1000]}..."  # Truncate if too long
                 )
                 jira_result = create_jira_issue(summary, description)
+                print(f"Jira issue created: {jira_result}")
                 result["jira_issue"] = jira_result.get("key")
             except Exception as jira_exc:
+                print(f"Jira issue creation failed: {jira_exc}")
                 result["jira_error"] = str(jira_exc)
 
         return result
