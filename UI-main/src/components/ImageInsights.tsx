@@ -515,13 +515,31 @@ ${JSON.stringify(chartData.data, null, 2)}
           {/* Feature Navigation */}
           {onFeatureSelect && (
             <div
-              className="mt-6 w-full flex gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10 pb-2 border-b border-gray-200"
-              style={{ WebkitOverflowScrolling: 'touch', minWidth: 0 }}
+              className="mt-6 w-full flex gap-2 pb-2 border-b border-gray-200"
+              style={{ minWidth: 0 }}
             >
-              {features.map((feature) => {
+              {features.map((feature, idx) => {
                 const Icon = feature.icon;
-                // Fix: Use 'diagram' as the id for the chart/insight feature to match FeatureType
                 const isActive = feature.id === 'diagram';
+                // Only the first feature button gets horizontal scroll for testing
+                if (idx === 0) {
+                  return (
+                    <div key={feature.id} className="overflow-x-auto scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10" style={{ maxWidth: 150 }}>
+                      <button
+                        onClick={() => onFeatureSelect(feature.id as any)}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg backdrop-blur-sm border transition-all duration-200 whitespace-nowrap min-w-max ${
+                          isActive
+                            ? 'bg-white/90 text-confluence-blue shadow-lg border-white/30'
+                            : 'bg-white/10 text-white hover:bg-white/20 border-white/10'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-sm font-medium">{feature.label}</span>
+                      </button>
+                    </div>
+                  );
+                }
+                // All other buttons are normal
                 return (
                   <button
                     key={feature.id}
