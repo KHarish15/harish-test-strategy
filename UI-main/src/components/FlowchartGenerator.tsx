@@ -20,8 +20,10 @@ const FlowchartGenerator: React.FC = () => {
       try {
         const response = await apiService.getSpaces();
         setSpaces(response.spaces);
+        console.log("[FlowchartGenerator] Fetched spaces:", response.spaces); // DEBUG
       } catch (err) {
         setError("Failed to load spaces. Please check your backend connection.");
+        console.error("[FlowchartGenerator] Error fetching spaces:", err); // DEBUG
       } finally {
         setIsLoadingSpaces(false);
       }
@@ -34,15 +36,18 @@ const FlowchartGenerator: React.FC = () => {
     const loadPages = async () => {
       if (!spaceKey) {
         setPages([]);
+        console.warn("[FlowchartGenerator] No valid spaceKey provided to loadPages:", spaceKey); // DEBUG
         return;
       }
       setIsLoadingPages(true);
       try {
         const response = await apiService.getPages(spaceKey);
         setPages(response.pages);
+        console.log("[FlowchartGenerator] Fetched pages for spaceKey", spaceKey, ":", response.pages); // DEBUG
       } catch (err) {
         setError("Failed to load pages. Please check your space key.");
         setPages([]);
+        console.error("[FlowchartGenerator] Error fetching pages:", err); // DEBUG
       } finally {
         setIsLoadingPages(false);
       }
