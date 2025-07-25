@@ -50,6 +50,12 @@ if not GEMINI_API_KEY:
 # Configure Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Add Jenkins config from environment
+JENKINS_URL = os.getenv("JENKINS_URL")
+JENKINS_JOB = os.getenv("JENKINS_JOB")
+JENKINS_USER = os.getenv("JENKINS_USER")
+JENKINS_API_TOKEN = os.getenv("JENKINS_API_TOKEN")
+
 # Pydantic models for request/response
 class SearchRequest(BaseModel):
     space_key: str
@@ -825,7 +831,29 @@ Please format your response exactly like this structure, using proper markdown h
         strategy_text = response_strategy.text.strip()
         
         print(f"Strategy generated: {len(strategy_text)} chars")  # Debug log
-        
+
+        # --- Jenkins Integration ---
+        jenkins_result = None
+        jenkins_log = None
+        if JENKINS_URL and JENKINS_JOB and JENKINS_USER and JENKINS_API_TOKEN:
+            try:
+                # Trigger Jenkins job
+                build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/build"
+                resp = requests.post(build_url, auth=(JENKINS_USER, JENKINS_API_TOKEN))
+                resp.raise_for_status()
+                # Optionally, poll for build status and fetch logs (simplified)
+                jenkins_result = f"Triggered Jenkins job: {JENKINS_JOB}"
+                # For demo: fetch last build log
+                last_build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/lastBuild/consoleText"
+                log_resp = requests.get(last_build_url, auth=(JENKINS_USER, JENKINS_API_TOKEN))
+                if log_resp.status_code == 200:
+                    jenkins_log = log_resp.text[-2000:]  # last 2000 chars
+            except Exception as e:
+                jenkins_result = f"Failed to trigger Jenkins: {str(e)}"
+        else:
+            jenkins_result = "Jenkins config missing in environment."
+        # --- End Jenkins Integration ---
+
         # Generate cross-platform testing
         prompt_cross_platform = f"""You are a cross-platform UI testing expert. Analyze the following frontend code and generate a detailed cross-platform test strategy using the structure below. Your insights should be **relevant to the code**, not generic. Code:\n\n{code_content[:2000]}\n\nFollow the format strictly and customize values based on the code analysis. Avoid repeating default phrases — provide actual testing considerations derived from the code.
 
@@ -920,7 +948,9 @@ Respond **exactly** in this format with dynamic insights, no extra text outside 
             "test_strategy": strategy_text,
             "cross_platform_testing": cross_text,
             "sensitivity_analysis": sensitivity_text,
-            "ai_response": ai_response
+            "ai_response": ai_response,
+            "jenkins_result": jenkins_result,
+            "jenkins_log": jenkins_log,
         }
         
         print(f"Returning result: {result}")  # Debug log
