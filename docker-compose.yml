@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  woodpecker-server:
+    image: woodpeckerci/woodpecker-server:latest
+    restart: always
+    environment:
+      WOODPECKER_OPEN: 'true'
+      WOODPECKER_HOST: '${WOODPECKER_HOST}' # e.g. https://your-woodpecker-on-render.onrender.com
+      WOODPECKER_GITHUB: 'true'
+      WOODPECKER_GITHUB_CLIENT: '${WOODPECKER_GITHUB_CLIENT}'
+      WOODPECKER_GITHUB_SECRET: '${WOODPECKER_GITHUB_SECRET}'
+      WOODPECKER_ADMIN: '${WOODPECKER_ADMIN}'
+      WOODPECKER_AGENT_SECRET: '${WOODPECKER_AGENT_SECRET}'
+    ports:
+      - 8000:8000
+      - 9000:9000
+
+  woodpecker-agent:
+    image: woodpeckerci/woodpecker-agent:latest
+    restart: always
+    depends_on:
+      - woodpecker-server
+    environment:
+      WOODPECKER_SERVER: 'ws://woodpecker-server:9000'
+      WOODPECKER_AGENT_SECRET: '${WOODPECKER_AGENT_SECRET}' 

@@ -50,12 +50,6 @@ if not GEMINI_API_KEY:
 # Configure Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Add Jenkins config from environment
-JENKINS_URL = os.getenv("JENKINS_URL")
-JENKINS_JOB = os.getenv("JENKINS_JOB")
-JENKINS_USER = os.getenv("JENKINS_USER")
-JENKINS_API_TOKEN = os.getenv("JENKINS_API_TOKEN")
-
 # Pydantic models for request/response
 class SearchRequest(BaseModel):
     space_key: str
@@ -744,6 +738,66 @@ Answer:"""
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+WOODPECKER_BASE_URL = os.environ.get("WOODPECKER_BASE_URL", "https://your-woodpecker.onrender.com/api")
+WOODPECKER_REPO = os.environ.get("WOODPECKER_REPO", "youruser/yourrepo")
+WOODPECKER_BRANCH = os.environ.get("WOODPECKER_BRANCH", "main")
+WOODPECKER_TOKEN = os.environ.get("WOODPECKER_TOKEN", "your_woodpecker_api_token")
+
+# --- Woodpecker CI Integration ---
+def trigger_woodpecker_build():
+    url = f"{WOODPECKER_BASE_URL}/repos/{WOODPECKER_REPO}/builds"
+    response = requests.post(url, headers={
+        "Authorization": f"Bearer {WOODPECKER_TOKEN}"
+    }, json={"branch": WOODPECKER_BRANCH})
+    response.raise_for_status()
+    build_id = response.json()["number"]
+    return build_id
+
+def get_woodpecker_logs(build_id):
+    url = f"{WOODPECKER_BASE_URL}/repos/{WOODPECKER_REPO}/builds/{build_id}/logs"
+    for _ in range(20):
+        logs_resp = requests.get(url, headers={
+            "Authorization": f"Bearer {WOODPECKER_TOKEN}"
+        })
+        if logs_resp.status_code == 200 and "result.log" in logs_resp.text:
+            return logs_resp.text
+        time.sleep(3)
+    return "No logs found or timeout."
+
+# --- Test Support Route Update ---
+from fastapi import APIRouter, Request
+
+router = APIRouter()
+
+@router.post("/test-support")
+def test_support(request: Request):
+    build_id = trigger_woodpecker_build()
+    logs = get_woodpecker_logs(build_id)
+
+    gemini_prompt = f"""Analyze the following test log and suggest any fixes:\n\n{logs}\n\nReturn a clear summary of:\n- Passed vs failed tests\n- Likely causes of failure\n- Suggested code fixes\n"""
+
+    # Replace this with your actual Gemini/OpenAI client call
+    # response_analysis = ai_model.generate_content(gemini_prompt)
+    # log_analysis = response_analysis.text.strip()
+    log_analysis = "[Gemini analysis placeholder: integrate your AI model here]"
+
+    ai_summary = f"""
+    ## 🧪 Test Result Summary
+    Build ID: {build_id}
+
+    ### ✅ Gemini Analysis:
+    {log_analysis}
+    """
+
+    # Replace with your actual save_to_confluence function call
+    # save_to_confluence(SaveToConfluenceRequest(
+    #     space_key=request.space_key,
+    #     page_title=request.code_page_title,
+    #     content=ai_summary
+    # ), request)
+
+    return {"build_id": build_id, "analysis": log_analysis}
+
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
     """Test Support Tool functionality"""
@@ -831,29 +885,7 @@ Please format your response exactly like this structure, using proper markdown h
         strategy_text = response_strategy.text.strip()
         
         print(f"Strategy generated: {len(strategy_text)} chars")  # Debug log
-
-        # --- Jenkins Integration ---
-        jenkins_result = None
-        jenkins_log = None
-        if JENKINS_URL and JENKINS_JOB and JENKINS_USER and JENKINS_API_TOKEN:
-            try:
-                # Trigger Jenkins job
-                build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/build"
-                resp = requests.post(build_url, auth=(JENKINS_USER, JENKINS_API_TOKEN))
-                resp.raise_for_status()
-                # Optionally, poll for build status and fetch logs (simplified)
-                jenkins_result = f"Triggered Jenkins job: {JENKINS_JOB}"
-                # For demo: fetch last build log
-                last_build_url = f"{JENKINS_URL}/job/{JENKINS_JOB}/lastBuild/consoleText"
-                log_resp = requests.get(last_build_url, auth=(JENKINS_USER, JENKINS_API_TOKEN))
-                if log_resp.status_code == 200:
-                    jenkins_log = log_resp.text[-2000:]  # last 2000 chars
-            except Exception as e:
-                jenkins_result = f"Failed to trigger Jenkins: {str(e)}"
-        else:
-            jenkins_result = "Jenkins config missing in environment."
-        # --- End Jenkins Integration ---
-
+        
         # Generate cross-platform testing
         prompt_cross_platform = f"""You are a cross-platform UI testing expert. Analyze the following frontend code and generate a detailed cross-platform test strategy using the structure below. Your insights should be **relevant to the code**, not generic. Code:\n\n{code_content[:2000]}\n\nFollow the format strictly and customize values based on the code analysis. Avoid repeating default phrases — provide actual testing considerations derived from the code.
 
@@ -948,9 +980,7 @@ Respond **exactly** in this format with dynamic insights, no extra text outside 
             "test_strategy": strategy_text,
             "cross_platform_testing": cross_text,
             "sensitivity_analysis": sensitivity_text,
-            "ai_response": ai_response,
-            "jenkins_result": jenkins_result,
-            "jenkins_log": jenkins_log,
+            "ai_response": ai_response
         }
         
         print(f"Returning result: {result}")  # Debug log
