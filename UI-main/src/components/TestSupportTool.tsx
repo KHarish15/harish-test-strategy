@@ -52,7 +52,6 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
   const [testMetrics, setTestMetrics] = useState<TestMetrics | null>(null);
   const [testRecommendations, setTestRecommendations] = useState<TestRecommendations | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
-  const [activeTab, setActiveTab] = useState<'analysis' | 'metrics' | 'pipeline'>('analysis');
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -121,16 +120,16 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
         test_input_page_title: testInputPage || undefined
       });
 
-      console.log('Test support API response:', result);
+      console.log('Test support strategy response:', result);
 
       setTestReport(prev => ({
         ...prev,
-        strategy: result.test_strategy || 'No test strategy generated.'
-      } as TestReport));
+        strategy: result.test_strategy
+      }));
     } catch (err) {
-      console.error('Test support API error:', err);
+      console.error('Test support strategy error:', err);
       setError('Failed to generate test strategy. Please try again.');
-      console.error('Error generating test strategy:', err);
+      console.error('Error generating strategy:', err);
     } finally {
       setIsGenerating('');
     }
@@ -146,22 +145,21 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
     setError('');
 
     try {
-      console.log('Calling test support API for cross-platform...');
+      console.log('Calling test support API for cross-platform analysis...');
       const result = await apiService.testSupport({
         space_key: selectedSpace,
         code_page_title: codePage,
         test_input_page_title: testInputPage || undefined
       });
 
-      console.log('Cross-platform API response:', result);
+      console.log('Test support cross-platform response:', result);
 
       setTestReport(prev => ({
         ...prev,
-        crossPlatform: (result.cross_platform_testing || 'No cross-platform analysis generated.').replace(/\u2192/g, '->')
-
-      } as TestReport));
+        crossPlatform: result.cross_platform_testing
+      }));
     } catch (err) {
-      console.error('Cross-platform API error:', err);
+      console.error('Test support cross-platform error:', err);
       setError('Failed to generate cross-platform analysis. Please try again.');
       console.error('Error generating cross-platform analysis:', err);
     } finally {
@@ -179,21 +177,21 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
     setError('');
 
     try {
-      console.log('Calling test support API for sensitivity...');
+      console.log('Calling test support API for sensitivity analysis...');
       const result = await apiService.testSupport({
         space_key: selectedSpace,
         code_page_title: codePage,
         test_input_page_title: testInputPage || undefined
       });
 
-      console.log('Sensitivity API response:', result);
+      console.log('Test support sensitivity response:', result);
 
       setTestReport(prev => ({
         ...prev,
-        sensitivity: (result.sensitivity_analysis || 'No sensitivity analysis generated.')
-      } as TestReport));
+        sensitivity: result.sensitivity_analysis
+      }));
     } catch (err) {
-      console.error('Sensitivity API error:', err);
+      console.error('Test support sensitivity error:', err);
       setError('Failed to generate sensitivity analysis. Please try again.');
       console.error('Error generating sensitivity analysis:', err);
     } finally {
@@ -379,46 +377,7 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
             </div>
           )}
 
-          {/* Tab Navigation */}
-          <div className="mb-6 flex space-x-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('analysis')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'analysis'
-                  ? 'bg-white text-confluence-blue shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <TestTube className="w-4 h-4 inline mr-2" />
-              Test Analysis
-            </button>
-            <button
-              onClick={() => setActiveTab('metrics')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'metrics'
-                  ? 'bg-white text-confluence-blue shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <Activity className="w-4 h-4 inline mr-2" />
-              Test Metrics
-            </button>
-            <button
-              onClick={() => setActiveTab('pipeline')}
-              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'pipeline'
-                  ? 'bg-white text-confluence-blue shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <GitBranch className="w-4 h-4 inline mr-2" />
-              CI/CD Pipeline
-            </button>
-          </div>
-
-          {/* Analysis Tab Content */}
-          {activeTab === 'analysis' && (
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Left Column - Configuration */}
             <div className="xl:col-span-1">
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 space-y-6 border border-white/20 shadow-lg">
@@ -596,23 +555,25 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
                             return;
                           }
                           let content = '';
-                          if (testReport?.strategy) content += `# Test Strategy\n${testReport.strategy}\n`;
-                          if (testReport?.crossPlatform) content += `# Cross-Platform Analysis\n${testReport.crossPlatform}\n`;
-                          if (testReport?.sensitivity) content += `# Sensitivity Analysis\n${testReport.sensitivity}\n`;
-                          if (!content) {
-                            alert('No test report content to save.');
-                            return;
+                          if (testReport.strategy) content += `## Test Strategy\n${testReport.strategy}\n\n`;
+                          if (testReport.crossPlatform) content += `## Cross-Platform Analysis\n${testReport.crossPlatform}\n\n`;
+                          if (testReport.sensitivity) content += `## Sensitivity Analysis\n${testReport.sensitivity}\n\n`;
+                          if (qaResults.length > 0) {
+                            content += `## Q&A\n${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')}\n\n`;
                           }
+                          content += `Generated on: ${new Date().toLocaleString()}`;
+                          
                           try {
                             await apiService.saveToConfluence({
                               space_key: space,
                               page_title: page,
-                              content,
+                              content: content
                             });
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
-                          } catch (err: any) {
-                            alert('Failed to save to Confluence: ' + (err.message || err));
+                          } catch (err) {
+                            setError('Failed to save to Confluence. Please try again.');
+                            console.error('Error saving to Confluence:', err);
                           }
                         }}
                         className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded-lg hover:bg-confluence-blue transition-colors border border-white/10"
@@ -623,336 +584,156 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
                     </div>
                   </div>
                 )}
+
+                {/* CircleCI Metrics Display */}
+                {testMetrics && (
+                  <div className="pt-4 border-t border-white/20 space-y-3">
+                    <h4 className="font-semibold text-gray-800 flex items-center">
+                      <Activity className="w-4 h-4 mr-2" />
+                      Test Metrics
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Success Rate:</span>
+                        <span className="font-medium text-green-600">{testMetrics.success_rate}%</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Total Tests:</span>
+                        <span className="font-medium text-blue-600">{testMetrics.total_tests}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Build:</span>
+                        <span className="font-medium text-purple-600">#{testMetrics.build_info.build_number}</span>
+                      </div>
+                    </div>
+                    {testRecommendations && (
+                      <div className="mt-3">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">AI Recommendations:</h5>
+                        <div className="space-y-1">
+                          {testRecommendations.action_items.slice(0, 2).map((item, index) => (
+                            <div key={index} className="text-xs text-gray-600 flex items-start">
+                              <div className={`w-1 h-1 rounded-full mt-1.5 mr-2 ${
+                                testRecommendations.priority === 'high' ? 'bg-red-500' : 
+                                testRecommendations.priority === 'medium' ? 'bg-orange-500' : 'bg-green-500'
+                              }`} />
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Middle Columns - Generated Content */}
-            <div className="xl:col-span-2 space-y-6">
-              {/* Test Strategy */}
-              {testReport?.strategy && (
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                    <Play className="w-5 h-5 mr-2 text-confluence-blue" />
-                    Test Strategy
-                  </h3>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
-                    {testReport.strategy.split('\n').map((line, index) => {
-                      if (line.startsWith('### ')) {
-                        return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                      } else if (line.startsWith('## ')) {
-                        return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                      } else if (line.startsWith('# ')) {
-                        return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                      } else if (line.startsWith('- **')) {
-                        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                        if (match) {
-                          return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                        }
-                      } else if (line.startsWith('- ')) {
-                        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
-                      } else if (line.trim()) {
-                        return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                      }
-                      return <br key={index} />;
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Cross-Platform Analysis */}
-              {testReport?.crossPlatform && (
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                    <Code className="w-5 h-5 mr-2 text-confluence-blue" />
-                    Cross-Platform Analysis
-                  </h3>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
-                    {testReport.crossPlatform.split('\n').map((line, index) => {
-                      if (line.startsWith('### ')) {
-                        return <h3 key={index} className="text-lg font-bold text-gray-800 mt-4 mb-2">{line.substring(4)}</h3>;
-                      } else if (line.startsWith('## ')) {
-                        return <h2 key={index} className="text-xl font-bold text-gray-800 mt-6 mb-3">{line.substring(3)}</h2>;
-                      } else if (line.startsWith('# ')) {
-                        return <h1 key={index} className="text-2xl font-bold text-gray-800 mt-8 mb-4">{line.substring(2)}</h1>;
-                      } else if (line.startsWith('- **')) {
-                        const match = line.match(/- \*\*(.*?)\*\*: (.*)/);
-                        if (match) {
-                          return <p key={index} className="mb-2"><strong>{match[1]}:</strong> {match[2]}</p>;
-                        }
-                      } else if (line.startsWith('- ')) {
-                        return <p key={index} className="mb-1 ml-4">• {line.substring(2)}</p>;
-                      } else if (line.trim()) {
-                        return <p key={index} className="mb-2 text-gray-700">{line}</p>;
-                      }
-                      return <br key={index} />;
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Sensitivity Analysis */}
-              {testReport?.sensitivity && (
-                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
-                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                    <TestTube className="w-5 h-5 mr-2 text-confluence-blue" />
-                    Sensitivity Analysis
-                  </h3>
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
-                    <div className="prose prose-sm max-w-none text-gray-800 bg-white/70 backdrop-blur-sm p-4 rounded-lg border border-white/20">
-                    <ReactMarkdown>
-                      {testReport.sensitivity}
-                    </ReactMarkdown>
+            {/* Right Column - Results */}
+            <div className="xl:col-span-3">
+              <div className="space-y-6">
+                {/* Test Strategy */}
+                {testReport?.strategy && (
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                      <FileCheck className="w-5 h-5 mr-2 text-confluence-blue" />
+                      Test Strategy
+                    </h3>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
+                      <ReactMarkdown>
+                        {testReport.strategy}
+                      </ReactMarkdown>
                     </div>
-                  </div>
-                </div>
-              )}
-              </div>
-
-            {/* Right Column - Q&A */}
-            <div className="xl:col-span-1">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 space-y-4 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                  <MessageSquare className="w-5 h-5 mr-2" />
-                  Questions & Analysis
-                </h3>
-                
-                {/* Existing Q&A */}
-                {qaResults.length > 0 && (
-                  <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
-                    {qaResults.map((qa, index) => (
-                      <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                        <p className="font-medium text-gray-800 mb-2 text-sm">Q: {qa.question}</p>
-                        <p className="text-gray-700 text-xs">{qa.answer.substring(0, 200)}...</p>
-                      </div>
-                    ))}
                   </div>
                 )}
 
-                {/* Add Question */}
-                <div className="space-y-2">
-                  <textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Ask about testing strategies, coverage, or specific scenarios..."
-                    className="w-full p-2 border border-white/30 rounded focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue resize-none bg-white/70 backdrop-blur-sm"
-                    rows={3}
-                  />
-                  <button
-                    onClick={addQuestion}
-                    disabled={!question.trim() || isQALoading}
-                    className="w-full px-3 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 border border-white/10"
-                  >
-                    {isQALoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Loading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="w-4 h-4" />
-                        <span>Ask Question</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Empty State */}
-          {!testReport?.strategy && !testReport?.crossPlatform && !testReport?.sensitivity && (
-            <div className="text-center py-12">
-              <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Generate Test Analysis</h3>
-              <p className="text-gray-500">Select your code and test components, then choose which analysis to generate.</p>
-            </div>
-          )}
-            </div>
-          )}
-
-          {/* Metrics Tab Content */}
-          {activeTab === 'metrics' && (
-            <div className="space-y-6">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-gray-800 flex items-center">
-                    <Activity className="w-6 h-6 mr-3 text-confluence-blue" />
-                    Test Metrics Dashboard
-                  </h3>
-                  <button
-                    onClick={fetchTestMetrics}
-                    disabled={isLoadingMetrics}
-                    className="px-4 py-2 bg-confluence-blue text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center space-x-2"
-                  >
-                    {isLoadingMetrics ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Loading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Activity className="w-4 h-4" />
-                        <span>Refresh Metrics</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {testMetrics ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Success Rate */}
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-green-600">Success Rate</p>
-                          <p className="text-2xl font-bold text-green-800">{testMetrics.success_rate}%</p>
-                        </div>
-                        <CheckCircle className="w-8 h-8 text-green-500" />
-                      </div>
-                    </div>
-
-                    {/* Total Tests */}
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-blue-600">Total Tests</p>
-                          <p className="text-2xl font-bold text-blue-800">{testMetrics.total_tests}</p>
-                        </div>
-                        <TestTube className="w-8 h-8 text-blue-500" />
-                      </div>
-                    </div>
-
-                    {/* Build Info */}
-                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-purple-600">Build #{testMetrics.build_info.build_number}</p>
-                          <p className="text-sm text-purple-700">{testMetrics.build_info.branch}</p>
-                        </div>
-                        <GitBranch className="w-8 h-8 text-purple-500" />
-                      </div>
+                {/* Cross-Platform Analysis */}
+                {testReport?.crossPlatform && (
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                      <Code className="w-5 h-5 mr-2 text-confluence-blue" />
+                      Cross-Platform Analysis
+                    </h3>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
+                      <ReactMarkdown>
+                        {testReport.crossPlatform}
+                      </ReactMarkdown>
                     </div>
                   </div>
+                )}
 
-                  {/* Recommendations */}
-                  {testRecommendations && (
-                    <div className="mt-6 bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                      <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-                        <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
-                        AI Recommendations
-                      </h4>
-                      <div className="space-y-2">
-                        {testRecommendations.action_items.map((item, index) => (
-                          <div key={index} className="flex items-start space-x-2">
-                            <div className={`w-2 h-2 rounded-full mt-2 ${
-                              testRecommendations.priority === 'high' ? 'bg-red-500' : 
-                              testRecommendations.priority === 'medium' ? 'bg-orange-500' : 'bg-green-500'
-                            }`} />
-                            <p className="text-sm text-gray-700">{item}</p>
-                          </div>
-                        ))}
-                      </div>
+                {/* Sensitivity Analysis */}
+                {testReport?.sensitivity && (
+                  <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 border border-white/20 shadow-lg">
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                      <TestTube className="w-5 h-5 mr-2 text-confluence-blue" />
+                      Sensitivity Analysis
+                    </h3>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20 prose prose-sm max-w-none">
+                      <ReactMarkdown>
+                        {testReport.sensitivity}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* Q&A Section */}
+                <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 space-y-4 border border-white/20 shadow-lg">
+                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
+                    <MessageSquare className="w-5 h-5 mr-2" />
+                    Questions & Analysis
+                  </h3>
+                  
+                  {/* Existing Q&A */}
+                  {qaResults.length > 0 && (
+                    <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                      {qaResults.map((qa, index) => (
+                        <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+                          <p className="font-medium text-gray-800 mb-2 text-sm">Q: {qa.question}</p>
+                          <p className="text-gray-700 text-xs">{qa.answer.substring(0, 200)}...</p>
+                        </div>
+                      ))}
                     </div>
                   )}
-                ) : (
-                  <div className="text-center py-12">
-                    <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">No Metrics Available</h3>
-                    <p className="text-gray-500">Click "Refresh Metrics" to fetch the latest test data.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* Pipeline Tab Content */}
-          {activeTab === 'pipeline' && (
-            <div className="space-y-6">
-              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-gray-800 flex items-center">
-                    <GitBranch className="w-6 h-6 mr-3 text-confluence-blue" />
-                    CI/CD Pipeline Management
-                  </h3>
-                  <button
-                    onClick={triggerTestPipeline}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    <span>Trigger Pipeline</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Pipeline Status */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-                      <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
-                      Pipeline Status
-                    </h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Last Build:</span>
-                        <span className="text-sm font-medium text-green-600">Success</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Duration:</span>
-                        <span className="text-sm font-medium text-gray-800">17s</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Branch:</span>
-                        <span className="text-sm font-medium text-gray-800">circleci-project-setup</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Builds */}
-                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-                      <Clock className="w-5 h-5 mr-2 text-blue-500" />
-                      Recent Builds
-                    </h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Build #4</span>
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Build #3</span>
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Build #2</span>
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* AI Integration Status */}
-                <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
-                  <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
-                    <Activity className="w-5 h-5 mr-2 text-blue-500" />
-                    AI Integration Status
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-sm text-gray-700">Test Analysis</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-sm text-gray-700">Confluence Integration</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-sm text-gray-700">Real-time Monitoring</span>
-                    </div>
+                  {/* Add Question */}
+                  <div className="space-y-2">
+                    <textarea
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      placeholder="Ask about testing strategies, coverage, or specific scenarios..."
+                      className="w-full p-2 border border-white/30 rounded focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue resize-none bg-white/70 backdrop-blur-sm"
+                      rows={3}
+                    />
+                    <button
+                      onClick={addQuestion}
+                      disabled={!question.trim() || isQALoading}
+                      className="w-full px-3 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2 border border-white/10"
+                    >
+                      {isQALoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-4 h-4" />
+                          <span>Ask Question</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
+
+              {/* Empty State */}
+              {!testReport?.strategy && !testReport?.crossPlatform && !testReport?.sensitivity && (
+                <div className="text-center py-12">
+                  <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Generate Test Analysis</h3>
+                  <p className="text-gray-500">Select your code and test components, then choose which analysis to generate.</p>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
       {showToast && (
