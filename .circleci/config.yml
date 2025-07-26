@@ -30,7 +30,7 @@ jobs:
             # Call your Agentic AI API (replace with your actual API endpoint)
             try:
                 ai_response = requests.post(
-                    'https://your-backend.onrender.com/analyze-logs',
+                    'https://backend-az2r.onrender.com/analyze-logs',
                     json={'test_results': test_results},
                     timeout=30
                 )
@@ -55,7 +55,7 @@ jobs:
                     """
                 }
                 requests.post(
-                    'https://your-backend.onrender.com/save-to-confluence',
+                    'https://backend-az2r.onrender.com/save-to-confluence',
                     json=confluence_data,
                     timeout=30
                 )

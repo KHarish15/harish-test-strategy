@@ -800,6 +800,50 @@ def test_support(request: Request):
 
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
+
+@app.post("/analyze-logs")
+async def analyze_logs(request: Request):
+    """Endpoint for CircleCI to send test logs for AI analysis"""
+    try:
+        data = await request.json()
+        test_results = data.get('test_results', {})
+        
+        # Create prompt for AI analysis
+        prompt = f"""
+        Analyze the following test results and provide insights:
+        
+        Test Results:
+        - Status: {test_results.get('status', 'unknown')}
+        - Passed: {test_results.get('passed', 0)}
+        - Failed: {test_results.get('failed', 0)}
+        - Logs: {test_results.get('logs', 'No logs provided')}
+        
+        Please provide:
+        1. Summary of test results
+        2. Root cause analysis for any failures
+        3. Suggested fixes or improvements
+        4. Recommendations for test coverage
+        """
+        
+        # Call Gemini AI for analysis
+        model = genai.GenerativeModel('gemini-pro')
+        response = model.generate_content(prompt)
+        analysis = response.text
+        
+        return {
+            "status": "success",
+            "analysis": analysis,
+            "test_results": test_results
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "analysis": "AI analysis failed due to an error"
+        }
+
+@app.post("/save-to-confluence")
+async def save_to_confluence(request: SaveToConfluenceRequest, req: Request):
     """Test Support Tool functionality"""
     try:
         api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
