@@ -767,36 +767,7 @@ def get_woodpecker_logs(build_id):
 # --- Test Support Route Update ---
 from fastapi import APIRouter, Request
 
-router = APIRouter()
-
-@router.post("/test-support")
-def test_support(request: Request):
-    build_id = trigger_woodpecker_build()
-    logs = get_woodpecker_logs(build_id)
-
-    gemini_prompt = f"""Analyze the following test log and suggest any fixes:\n\n{logs}\n\nReturn a clear summary of:\n- Passed vs failed tests\n- Likely causes of failure\n- Suggested code fixes\n"""
-
-    # Replace this with your actual Gemini/OpenAI client call
-    # response_analysis = ai_model.generate_content(gemini_prompt)
-    # log_analysis = response_analysis.text.strip()
-    log_analysis = "[Gemini analysis placeholder: integrate your AI model here]"
-
-    ai_summary = f"""
-    ## 🧪 Test Result Summary
-    Build ID: {build_id}
-
-    ### ✅ Gemini Analysis:
-    {log_analysis}
-    """
-
-    # Replace with your actual save_to_confluence function call
-    # save_to_confluence(SaveToConfluenceRequest(
-    #     space_key=request.space_key,
-    #     page_title=request.code_page_title,
-    #     content=ai_summary
-    # ), request)
-
-    return {"build_id": build_id, "analysis": log_analysis}
+# Removed duplicate router endpoint to fix conflicts
 
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
