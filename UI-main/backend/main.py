@@ -738,31 +738,9 @@ Answer:"""
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-WOODPECKER_BASE_URL = os.environ.get("WOODPECKER_BASE_URL", "https://your-woodpecker.onrender.com/api")
-WOODPECKER_REPO = os.environ.get("WOODPECKER_REPO", "youruser/yourrepo")
-WOODPECKER_BRANCH = os.environ.get("WOODPECKER_BRANCH", "main")
-WOODPECKER_TOKEN = os.environ.get("WOODPECKER_TOKEN", "your_woodpecker_api_token")
-
-# --- Woodpecker CI Integration ---
-def trigger_woodpecker_build():
-    url = f"{WOODPECKER_BASE_URL}/repos/{WOODPECKER_REPO}/builds"
-    response = requests.post(url, headers={
-        "Authorization": f"Bearer {WOODPECKER_TOKEN}"
-    }, json={"branch": WOODPECKER_BRANCH})
-    response.raise_for_status()
-    build_id = response.json()["number"]
-    return build_id
-
-def get_woodpecker_logs(build_id):
-    url = f"{WOODPECKER_BASE_URL}/repos/{WOODPECKER_REPO}/builds/{build_id}/logs"
-    for _ in range(20):
-        logs_resp = requests.get(url, headers={
-            "Authorization": f"Bearer {WOODPECKER_TOKEN}"
-        })
-        if logs_resp.status_code == 200 and "result.log" in logs_resp.text:
-            return logs_resp.text
-        time.sleep(3)
-    return "No logs found or timeout."
+# --- CircleCI Integration Only ---
+# CircleCI integration is handled via the .circleci/config.yml file
+# which sends test results to /analyze-logs endpoint and posts to Confluence
 
 # --- Test Support Route Update ---
 from fastapi import APIRouter, Request
