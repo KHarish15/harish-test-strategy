@@ -800,29 +800,230 @@ def test_support(request: Request):
 
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
+    """Test Support Tool functionality"""
+    try:
+        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
+        genai.configure(api_key=api_key)
+        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
+        print(f"Test support request: {request}")  # Debug log
+        confluence = init_confluence()
+        space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
+        
+        # Get code page
+        pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
+        code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
+        
+        if not code_page:
+            raise HTTPException(status_code=400, detail="Code page not found")
+        
+        print(f"Found code page: {code_page['title']}")  # Debug log
+        
+        code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
+        code_content = code_data["body"]["storage"]["value"]
+        
+        print(f"Code content length: {len(code_content)}")  # Debug log
+        
+        # Generate test strategy
+        prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
+
+Make sure each section heading is **clearly labeled** and includes a **percentage estimate** of total testing effort and the total of all percentage values across Unit Test, Integration Test, and End-to-End (E2E) Test must add up to exactly **100%**. Each subpoint should be short (1–2 lines max). Use bullet points for clarity.
+
+---
+
+## Unit Test (xx%)
+- **Coverage Areas**:  
+  - What functions or UI elements are directly tested?  
+- **Edge Cases**:  
+  - List 2–3 specific edge conditions or unusual inputs.
+
+## Integration Test (xx%)
+- **Integrated Modules**:  
+  - What parts of the system work together and need testing as a unit?  
+- **Data Flow Validation**:  
+  - How does data move between components or layers?
+
+## End-to-End (E2E) Test (xx%)
+- **User Scenarios**:  
+  - Provide 2–3 user flows that simulate real usage.  
+- **System Dependencies**:  
+  - What systems, APIs, or services must be operational?
+
+## Test Data Management
+- **Data Requirements**:  
+  - What test data (e.g., users, tokens, inputs) is needed?  
+- **Data Setup & Teardown**:  
+  - How is test data created and cleaned up?
+
+## Risk Assessment
+- **High-Risk Areas**:  
+  - Which parts of the code are most likely to fail?  
+- **Mitigation Strategies**:  
+  - How can we reduce testing risks?
+
+## Test Environment Setup
+- **Required Tools**:  
+  - What testing frameworks and tools are needed?  
+- **Configuration**:  
+  - What environment variables or settings are required?
+
+## Timeline Estimation
+- **Development Time**:  
+  - How long will it take to write these tests?  
+- **Execution Time**:  
+  - How long will the test suite take to run?
+
+Please ensure the percentages add up to 100% and provide specific, actionable recommendations."""
+        
+        response_strategy = ai_model.generate_content(prompt_strategy)
+        strategy_content = response_strategy.text
+        
+        # Generate cross-platform testing strategy
+        prompt_cross_platform = f"""Based on the code:\n\n{code_content[:2000]}\n\nGenerate a **cross-platform testing strategy** covering:
+
+## Browser Compatibility
+- **Supported Browsers**: Chrome, Firefox, Safari, Edge
+- **Version Testing**: Latest 2 versions of each browser
+- **Mobile Browsers**: iOS Safari, Chrome Mobile
+
+## Operating System Testing
+- **Desktop OS**: Windows, macOS, Linux
+- **Mobile OS**: iOS, Android
+- **Virtualization**: Docker containers for consistency
+
+## Device Testing
+- **Desktop**: Different screen resolutions (1920x1080, 1366x768, 2560x1440)
+- **Tablet**: iPad, Android tablets
+- **Mobile**: iPhone, Android phones (portrait and landscape)
+
+## Accessibility Testing
+- **Screen Readers**: NVDA, JAWS, VoiceOver
+- **Keyboard Navigation**: Tab order, shortcuts
+- **Color Contrast**: WCAG 2.1 AA compliance
+
+## Performance Testing
+- **Load Testing**: Multiple concurrent users
+- **Stress Testing**: System limits
+- **Network Conditions**: Slow 3G, fast WiFi, offline mode
+
+## Security Testing
+- **Authentication**: Different user roles
+- **Data Validation**: Input sanitization
+- **API Security**: Rate limiting, CORS
+
+Provide specific test scenarios and tools for each category."""
+        
+        response_cross_platform = ai_model.generate_content(prompt_cross_platform)
+        cross_platform_content = response_cross_platform.text
+        
+        # Generate test sensitivity analysis
+        prompt_sensitivity = f"""Analyze the following code for **test sensitivity** and **flaky test prevention**:
+
+{code_content[:2000]}
+
+Provide a comprehensive analysis covering:
+
+## Flaky Test Identification
+- **Time-dependent operations**: Date/time functions, delays
+- **External dependencies**: API calls, database connections
+- **State management**: Shared state, cleanup issues
+- **Concurrency issues**: Race conditions, async operations
+
+## Test Isolation Strategies
+- **Mocking strategies**: What to mock and how
+- **Test data management**: Isolated test data
+- **Environment setup**: Clean environment per test
+- **Teardown procedures**: Proper cleanup
+
+## Deterministic Testing
+- **Fixed timestamps**: Use specific dates/times
+- **Controlled randomness**: Seed random generators
+- **Stable identifiers**: Use consistent IDs
+- **Order-independent tests**: Avoid test dependencies
+
+## Monitoring and Detection
+- **Flaky test detection**: Tools and techniques
+- **Retry strategies**: When and how to retry
+- **Failure analysis**: Root cause investigation
+- **Metrics tracking**: Success rate monitoring
+
+## Prevention Best Practices
+- **Code review guidelines**: What to look for
+- **Testing patterns**: Anti-patterns to avoid
+- **CI/CD integration**: Pipeline considerations
+- **Documentation**: Test requirements and assumptions
+
+Provide specific examples and code snippets for each category."""
+        
+        response_sensitivity = ai_model.generate_content(prompt_sensitivity)
+        sensitivity_content = response_sensitivity.text
+        
+        return {
+            "strategy": strategy_content,
+            "cross_platform": cross_platform_content,
+            "sensitivity": sensitivity_content
+        }
+        
+    except Exception as e:
+        print(f"Error in test support: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze-logs")
 async def analyze_logs(request: Request):
-    """Endpoint for CircleCI to send test logs for AI analysis"""
+    """Enhanced endpoint for CircleCI to send test logs for AI analysis"""
     try:
         data = await request.json()
         test_results = data.get('test_results', {})
         
-        # Create prompt for AI analysis
-        prompt = f"""
-        Analyze the following test results and provide insights:
+        # Extract pipeline information
+        pipeline_info = test_results.get('pipeline_info', {})
+        branch = pipeline_info.get('branch', 'unknown')
+        commit = pipeline_info.get('commit', 'unknown')
+        build_number = pipeline_info.get('build_number', 'unknown')
         
-        Test Results:
+        # Create comprehensive prompt for AI analysis
+        prompt = f"""
+        You are an expert software testing analyst. Analyze the following test results from a CI/CD pipeline and provide detailed insights.
+
+        **Build Information:**
+        - Branch: {branch}
+        - Commit: {commit[:8] if commit != 'unknown' else 'unknown'}
+        - Build Number: {build_number}
+        - Timestamp: {test_results.get('timestamp', 'unknown')}
+
+        **Test Results:**
         - Status: {test_results.get('status', 'unknown')}
         - Passed: {test_results.get('passed', 0)}
         - Failed: {test_results.get('failed', 0)}
-        - Logs: {test_results.get('logs', 'No logs provided')}
+        - Coverage: {test_results.get('coverage', 'N/A')}
         
-        Please provide:
-        1. Summary of test results
-        2. Root cause analysis for any failures
-        3. Suggested fixes or improvements
-        4. Recommendations for test coverage
+        **Test Logs:**
+        {test_results.get('logs', 'No logs provided')}
+        
+        **Error Logs:**
+        {test_results.get('errors', 'No errors')}
+
+        Please provide a comprehensive analysis in the following format:
+
+        ## 📊 Test Summary
+        [Provide a clear summary of test results and overall status]
+
+        ## 🔍 Detailed Analysis
+        [Analyze specific test failures, patterns, and root causes]
+
+        ## 🛠️ Recommended Actions
+        [List specific actions to fix issues and improve testing]
+
+        ## 📈 Coverage Insights
+        [Analyze test coverage and suggest improvements]
+
+        ## 🚀 Performance Recommendations
+        [Suggest optimizations for test execution and CI/CD pipeline]
+
+        ## 🔮 Predictive Insights
+        [Based on patterns, predict potential future issues]
+
+        Be specific, actionable, and provide code examples where relevant.
         """
         
         # Call Gemini AI for analysis
@@ -830,16 +1031,42 @@ async def analyze_logs(request: Request):
         response = model.generate_content(prompt)
         analysis = response.text
         
+        # Generate additional metrics
+        total_tests = test_results.get('passed', 0) + test_results.get('failed', 0)
+        success_rate = (test_results.get('passed', 0) / total_tests * 100) if total_tests > 0 else 0
+        
+        # Create structured response
         return {
             "status": "success",
             "analysis": analysis,
-            "test_results": test_results
+            "metrics": {
+                "total_tests": total_tests,
+                "success_rate": round(success_rate, 2),
+                "build_info": {
+                    "branch": branch,
+                    "commit": commit[:8] if commit != 'unknown' else 'unknown',
+                    "build_number": build_number
+                }
+            },
+            "test_results": test_results,
+            "recommendations": {
+                "priority": "high" if test_results.get('failed', 0) > 0 else "low",
+                "action_items": [
+                    "Review failed tests immediately" if test_results.get('failed', 0) > 0 else "All tests passed - good job!",
+                    "Check test coverage reports",
+                    "Monitor for flaky tests"
+                ]
+            }
         }
     except Exception as e:
         return {
             "status": "error",
             "error": str(e),
-            "analysis": "AI analysis failed due to an error"
+            "analysis": "AI analysis failed due to an error",
+            "recommendations": {
+                "priority": "critical",
+                "action_items": ["Check AI service connectivity", "Review error logs"]
+            }
         }
 
 @app.post("/save-to-confluence")

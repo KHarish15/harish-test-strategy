@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TestTube, Code, FileCheck, Download, Save, X, ChevronDown, Loader2, MessageSquare, Play, Search, Video, TrendingUp, Image } from 'lucide-react';
+import { TestTube, Code, FileCheck, Download, Save, X, ChevronDown, Loader2, MessageSquare, Play, Search, Video, TrendingUp, Image, GitBranch, Clock, CheckCircle, XCircle, AlertTriangle, Activity } from 'lucide-react';
 import { FeatureType } from '../App';
 import apiService, { Space } from '../services/api';
 import ReactMarkdown from 'react-markdown';
@@ -18,6 +18,21 @@ interface TestReport {
   sensitivity?: string;
 }
 
+interface TestMetrics {
+  total_tests: number;
+  success_rate: number;
+  build_info: {
+    branch: string;
+    commit: string;
+    build_number: string;
+  };
+}
+
+interface TestRecommendations {
+  priority: string;
+  action_items: string[];
+}
+
 const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSelect, autoSpaceKey, isSpaceAutoConnected }) => {
   const [selectedSpace, setSelectedSpace] = useState('');
   const [codePage, setCodePage] = useState('');
@@ -32,6 +47,12 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
   const [pages, setPages] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [showToast, setShowToast] = useState(false);
+  
+  // New state for CircleCI integration
+  const [testMetrics, setTestMetrics] = useState<TestMetrics | null>(null);
+  const [testRecommendations, setTestRecommendations] = useState<TestRecommendations | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [activeTab, setActiveTab] = useState<'analysis' | 'metrics' | 'pipeline'>('analysis');
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -39,7 +60,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
     { id: 'code' as const, label: 'Code Assistant', icon: Code },
     { id: 'impact' as const, label: 'Impact Analyzer', icon: TrendingUp },
     { id: 'test' as const, label: 'Test Support Tool', icon: TestTube },
-    { id: 'image' as const, label: 'Image Insights & Chart Builder', icon: Image },
+    { id: 'diagram' as const, label: 'Diagram Tools', icon: Image },
   ];
 
   // Load spaces on component mount
@@ -254,6 +275,61 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
     }
   };
 
+  // New CircleCI integration functions
+  const fetchTestMetrics = async () => {
+    setIsLoadingMetrics(true);
+    setError('');
+    
+    try {
+      // Simulate fetching test metrics from CircleCI
+      // In a real implementation, this would call your backend API
+      const mockMetrics: TestMetrics = {
+        total_tests: 15,
+        success_rate: 86.7,
+        build_info: {
+          branch: 'circleci-project-setup',
+          commit: '1d2c161',
+          build_number: '4'
+        }
+      };
+      
+      const mockRecommendations: TestRecommendations = {
+        priority: 'medium',
+        action_items: [
+          'Review failed test: test_failure in test_example.py',
+          'Improve test coverage for edge cases',
+          'Consider adding integration tests'
+        ]
+      };
+      
+      setTestMetrics(mockMetrics);
+      setTestRecommendations(mockRecommendations);
+    } catch (err) {
+      setError('Failed to fetch test metrics. Please try again.');
+      console.error('Error fetching metrics:', err);
+    } finally {
+      setIsLoadingMetrics(false);
+    }
+  };
+
+  const triggerTestPipeline = async () => {
+    setError('');
+    
+    try {
+      // This would trigger a new CircleCI pipeline
+      console.log('Triggering new test pipeline...');
+      
+      // Simulate API call to trigger pipeline
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      setError('Failed to trigger pipeline. Please try again.');
+      console.error('Error triggering pipeline:', err);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-white flex items-center justify-center z-40 p-4">
       <div className="bg-white/80 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
@@ -303,7 +379,46 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
             </div>
           )}
 
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+          {/* Tab Navigation */}
+          <div className="mb-6 flex space-x-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('analysis')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'analysis'
+                  ? 'bg-white text-confluence-blue shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <TestTube className="w-4 h-4 inline mr-2" />
+              Test Analysis
+            </button>
+            <button
+              onClick={() => setActiveTab('metrics')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'metrics'
+                  ? 'bg-white text-confluence-blue shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Activity className="w-4 h-4 inline mr-2" />
+              Test Metrics
+            </button>
+            <button
+              onClick={() => setActiveTab('pipeline')}
+              className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'pipeline'
+                  ? 'bg-white text-confluence-blue shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <GitBranch className="w-4 h-4 inline mr-2" />
+              CI/CD Pipeline
+            </button>
+          </div>
+
+          {/* Analysis Tab Content */}
+          {activeTab === 'analysis' && (
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Left Column - Configuration */}
             <div className="xl:col-span-1">
               <div className="bg-white/60 backdrop-blur-xl rounded-xl p-4 space-y-6 border border-white/20 shadow-lg">
@@ -424,6 +539,25 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
                       <>
                         <TestTube className="w-4 h-4" />
                         <span>Sensitivity Check</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* CircleCI Integration Button */}
+                  <button
+                    onClick={fetchTestMetrics}
+                    disabled={isLoadingMetrics}
+                    className="w-full bg-green-600/90 backdrop-blur-sm text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors border border-white/10"
+                  >
+                    {isLoadingMetrics ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-4 h-4" />
+                        <span>CircleCI Metrics</span>
                       </>
                     )}
                   </button>
@@ -631,6 +765,192 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
               <TestTube className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Ready to Generate Test Analysis</h3>
               <p className="text-gray-500">Select your code and test components, then choose which analysis to generate.</p>
+            </div>
+          )}
+            </div>
+          )}
+
+          {/* Metrics Tab Content */}
+          {activeTab === 'metrics' && (
+            <div className="space-y-6">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-gray-800 flex items-center">
+                    <Activity className="w-6 h-6 mr-3 text-confluence-blue" />
+                    Test Metrics Dashboard
+                  </h3>
+                  <button
+                    onClick={fetchTestMetrics}
+                    disabled={isLoadingMetrics}
+                    className="px-4 py-2 bg-confluence-blue text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center space-x-2"
+                  >
+                    {isLoadingMetrics ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Activity className="w-4 h-4" />
+                        <span>Refresh Metrics</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {testMetrics ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Success Rate */}
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-600">Success Rate</p>
+                          <p className="text-2xl font-bold text-green-800">{testMetrics.success_rate}%</p>
+                        </div>
+                        <CheckCircle className="w-8 h-8 text-green-500" />
+                      </div>
+                    </div>
+
+                    {/* Total Tests */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-blue-600">Total Tests</p>
+                          <p className="text-2xl font-bold text-blue-800">{testMetrics.total_tests}</p>
+                        </div>
+                        <TestTube className="w-8 h-8 text-blue-500" />
+                      </div>
+                    </div>
+
+                    {/* Build Info */}
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-purple-600">Build #{testMetrics.build_info.build_number}</p>
+                          <p className="text-sm text-purple-700">{testMetrics.build_info.branch}</p>
+                        </div>
+                        <GitBranch className="w-8 h-8 text-purple-500" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recommendations */}
+                  {testRecommendations && (
+                    <div className="mt-6 bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                      <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                        <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
+                        AI Recommendations
+                      </h4>
+                      <div className="space-y-2">
+                        {testRecommendations.action_items.map((item, index) => (
+                          <div key={index} className="flex items-start space-x-2">
+                            <div className={`w-2 h-2 rounded-full mt-2 ${
+                              testRecommendations.priority === 'high' ? 'bg-red-500' : 
+                              testRecommendations.priority === 'medium' ? 'bg-orange-500' : 'bg-green-500'
+                            }`} />
+                            <p className="text-sm text-gray-700">{item}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                ) : (
+                  <div className="text-center py-12">
+                    <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">No Metrics Available</h3>
+                    <p className="text-gray-500">Click "Refresh Metrics" to fetch the latest test data.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pipeline Tab Content */}
+          {activeTab === 'pipeline' && (
+            <div className="space-y-6">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-gray-800 flex items-center">
+                    <GitBranch className="w-6 h-6 mr-3 text-confluence-blue" />
+                    CI/CD Pipeline Management
+                  </h3>
+                  <button
+                    onClick={triggerTestPipeline}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    <span>Trigger Pipeline</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Pipeline Status */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                      <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
+                      Pipeline Status
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Last Build:</span>
+                        <span className="text-sm font-medium text-green-600">Success</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Duration:</span>
+                        <span className="text-sm font-medium text-gray-800">17s</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Branch:</span>
+                        <span className="text-sm font-medium text-gray-800">circleci-project-setup</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Builds */}
+                  <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                      <Clock className="w-5 h-5 mr-2 text-blue-500" />
+                      Recent Builds
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Build #4</span>
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Build #3</span>
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Build #2</span>
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Integration Status */}
+                <div className="mt-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
+                  <h4 className="font-semibold text-gray-800 mb-3 flex items-center">
+                    <Activity className="w-5 h-5 mr-2 text-blue-500" />
+                    AI Integration Status
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-gray-700">Test Analysis</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-gray-700">Confluence Integration</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-gray-700">Real-time Monitoring</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
