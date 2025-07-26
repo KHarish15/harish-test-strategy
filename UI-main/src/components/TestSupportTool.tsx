@@ -124,7 +124,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
 
       setTestReport(prev => ({
         ...prev,
-        strategy: result.test_strategy
+        strategy: result.strategy
       }));
     } catch (err) {
       console.error('Test support strategy error:', err);
@@ -156,7 +156,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
 
       setTestReport(prev => ({
         ...prev,
-        crossPlatform: result.cross_platform_testing
+        crossPlatform: result.cross_platform
       }));
     } catch (err) {
       console.error('Test support cross-platform error:', err);
@@ -188,7 +188,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
 
       setTestReport(prev => ({
         ...prev,
-        sensitivity: result.sensitivity_analysis
+        sensitivity: result.sensitivity
       }));
     } catch (err) {
       console.error('Test support sensitivity error:', err);

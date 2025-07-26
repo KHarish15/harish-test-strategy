@@ -69,9 +69,9 @@ export interface ImpactResponse {
 }
 
 export interface TestResponse {
-  test_strategy: string;
-  cross_platform_testing: string;
-  sensitivity_analysis?: string;
+  strategy: string;
+  cross_platform: string;
+  sensitivity?: string;
   ai_response?: string;
 }
 
