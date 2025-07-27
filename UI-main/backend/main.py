@@ -785,21 +785,13 @@ def trigger_circleci_pipeline(branch="main", parameters=None):
             "Content-Type": "application/json"
         }
         
-        # Basic parameters that CircleCI API accepts
-        basic_params = {
-            "triggered_by": "test_support_tool"
-        }
-        
-        if parameters:
-            basic_params.update(parameters)
-        
+        # Minimal CircleCI API payload - no custom parameters
         payload = {
-            "branch": branch,
-            "parameters": basic_params
+            "branch": branch
         }
         
         print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
-        print(f"📋 Basic Parameters: {basic_params}")
+        print(f"📋 Payload: {payload}")
         print(f"🔗 CircleCI Dashboard URL: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}")
         
         response = requests.post(url, headers=headers, json=payload, timeout=30)
@@ -818,7 +810,7 @@ def trigger_circleci_pipeline(branch="main", parameters=None):
             # Send immediate notification to Confluence about the trigger
             try:
                 confluence_notification = {
-                    'space_key': basic_params.get('space_key', 'TEST'),
+                    'space_key': 'TEST',  # Default space key
                     'page_title': f'CircleCI Build #{build_number} - Live Status',
                     'content': f'''
 ## 🚀 CircleCI Pipeline Triggered - Live Status
@@ -1045,11 +1037,8 @@ async def test_support(request: TestRequest, req: Request):
         
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
-        circleci_params = {
-            "triggered_by": "test_support_tool"
-        }
         
-        circleci_result = trigger_circleci_pipeline("main", circleci_params)
+        circleci_result = trigger_circleci_pipeline("main")
         
         if not circleci_result['success']:
             print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
