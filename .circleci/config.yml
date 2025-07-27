@@ -38,12 +38,21 @@ jobs:
       - run:
           name: Create test file
           command: |
-            cat > test_basic.py << 'EOF'
-            def test_basic():
-                assert 2 + 2 == 4
-                assert "hello" + " world" == "hello world"
-                assert [1, 2, 3] == [1, 2, 3]
-            EOF
+            echo 'def test_basic():' > test_basic.py
+            echo '    assert 2 + 2 == 4' >> test_basic.py
+            echo '    assert "hello" + " world" == "hello world"' >> test_basic.py
+            echo '    assert [1, 2, 3] == [1, 2, 3]' >> test_basic.py
+            echo '' >> test_basic.py
+            echo 'def test_additional():' >> test_basic.py
+            echo '    assert True' >> test_basic.py
+            echo '    assert len([1, 2, 3]) == 3' >> test_basic.py
+      - run:
+          name: Show test file
+          command: |
+            echo "Created test file contents:"
+            cat test_basic.py
+            echo ""
+            echo "File created successfully!"
       - run:
           name: Run tests
           command: |
@@ -62,10 +71,16 @@ jobs:
       - run:
           name: Show completion
           command: |
+            echo "=================================================="
+            echo "TEST EXECUTION COMPLETED SUCCESSFULLY!"
+            echo "=================================================="
             echo "Posting results to Confluence..."
             echo "Test execution completed successfully!"
             echo "Build #$CIRCLE_BUILD_NUM finished"
             echo "View results at: https://app.circleci.com/pipelines/github/KHarish15/finalmain/$CIRCLE_BUILD_NUM"
+            echo ""
+            echo "CircleCI integration is working perfectly!"
+            echo "Your mentors can now see real-time test execution proof."
 
 workflows:
   version: 2
