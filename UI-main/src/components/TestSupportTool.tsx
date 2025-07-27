@@ -186,7 +186,13 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
         setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔗 Build #${circleciTrigger.number}`]);
       } else {
         setCircleciStatus('failed');
-        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ CircleCI trigger failed: ${circleciTrigger?.error || 'Unknown error'}`]);
+        const errorMsg = circleciTrigger?.error || 'Unknown error';
+        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ CircleCI trigger failed: ${errorMsg}`]);
+        
+        // Show setup instructions if CircleCI is not configured
+        if (circleciTrigger?.setup_required) {
+          setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 📋 Setup required: Set CIRCLECI_API_TOKEN and CIRCLECI_PROJECT_SLUG environment variables`]);
+        }
       }
 
       setTestReport(prev => ({

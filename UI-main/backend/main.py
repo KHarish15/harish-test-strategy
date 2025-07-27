@@ -750,12 +750,34 @@ import uuid
 
 # CircleCI API configuration
 CIRCLECI_API_TOKEN = os.getenv('CIRCLECI_API_TOKEN', 'your-circleci-token')
-CIRCLECI_PROJECT_SLUG = os.getenv('CIRCLECI_PROJECT_SLUG', 'github/your-username/your-repo')
+CIRCLECI_PROJECT_SLUG = os.getenv('CIRCLECI_PROJECT_SLUG', 'github/KHarish15/finalmain')
 CIRCLECI_API_BASE = "https://circleci.com/api/v2"
 
 def trigger_circleci_pipeline(branch="main", parameters=None):
     """Trigger a new CircleCI pipeline with enhanced visibility"""
     try:
+        # Check if CircleCI is properly configured
+        if CIRCLECI_API_TOKEN == 'your-circleci-token' or not CIRCLECI_API_TOKEN:
+            print("⚠️ CircleCI not configured - skipping pipeline trigger")
+            print("📋 To enable CircleCI integration, set these environment variables:")
+            print("   CIRCLECI_API_TOKEN=your-actual-circleci-token")
+            print("   CIRCLECI_PROJECT_SLUG=github/your-username/your-repo")
+            return {
+                "success": False,
+                "error": "CircleCI not configured. Please set CIRCLECI_API_TOKEN and CIRCLECI_PROJECT_SLUG environment variables.",
+                "setup_required": True
+            }
+        
+        if CIRCLECI_PROJECT_SLUG == 'github/your-username/your-repo':
+            print("⚠️ CircleCI project slug not configured - skipping pipeline trigger")
+            print("📋 To enable CircleCI integration, set CIRCLECI_PROJECT_SLUG environment variable:")
+            print("   CIRCLECI_PROJECT_SLUG=github/your-username/your-repo")
+            return {
+                "success": False,
+                "error": "CircleCI project slug not configured. Please set CIRCLECI_PROJECT_SLUG environment variable.",
+                "setup_required": True
+            }
+        
         url = f"{CIRCLECI_API_BASE}/project/{CIRCLECI_PROJECT_SLUG}/pipeline"
         
         headers = {
@@ -860,17 +882,29 @@ This page will be updated as the pipeline progresses. Refresh to see latest stat
                 "pipeline_url": f"https://app.circleci.com/pipelines/{pipeline_id}"
             }
         else:
-            print(f"❌ Failed to trigger CircleCI pipeline: {response.status_code} - {response.text}")
+            error_msg = f"CircleCI API returned {response.status_code}: {response.text}"
+            print(f"❌ Failed to trigger CircleCI pipeline: {error_msg}")
+            
+            # Provide helpful error messages
+            if response.status_code == 401:
+                error_msg = "Invalid CircleCI API token. Please check your CIRCLECI_API_TOKEN environment variable."
+            elif response.status_code == 404:
+                error_msg = "CircleCI project not found. Please check your CIRCLECI_PROJECT_SLUG environment variable."
+            elif response.status_code == 403:
+                error_msg = "CircleCI API token doesn't have permission to trigger pipelines."
+            
             return {
                 "success": False,
-                "error": f"CircleCI API returned {response.status_code}: {response.text}"
+                "error": error_msg,
+                "setup_required": True
             }
             
     except Exception as e:
         print(f"❌ Error triggering CircleCI pipeline: {str(e)}")
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "setup_required": True
         }
 
 def get_circleci_pipeline_status(pipeline_id):
