@@ -785,27 +785,21 @@ def trigger_circleci_pipeline(branch="main", parameters=None):
             "Content-Type": "application/json"
         }
         
-        # Enhanced parameters for better visibility
-        enhanced_params = {
-            "test_type": "strategy_generation",
-            "triggered_by": "test_support_tool",
-            "timestamp": datetime.now().isoformat(),
-            "request_id": str(uuid.uuid4()),
-            "visible_in_dashboard": True,
-            "show_live_logs": True,
-            "auto_post_to_confluence": True
+        # Basic parameters that CircleCI API accepts
+        basic_params = {
+            "triggered_by": "test_support_tool"
         }
         
         if parameters:
-            enhanced_params.update(parameters)
+            basic_params.update(parameters)
         
         payload = {
             "branch": branch,
-            "parameters": enhanced_params
+            "parameters": basic_params
         }
         
         print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
-        print(f"📋 Enhanced Parameters: {enhanced_params}")
+        print(f"📋 Basic Parameters: {basic_params}")
         print(f"🔗 CircleCI Dashboard URL: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}")
         
         response = requests.post(url, headers=headers, json=payload, timeout=30)
@@ -824,7 +818,7 @@ def trigger_circleci_pipeline(branch="main", parameters=None):
             # Send immediate notification to Confluence about the trigger
             try:
                 confluence_notification = {
-                    'space_key': enhanced_params.get('space_key', 'TEST'),
+                    'space_key': basic_params.get('space_key', 'TEST'),
                     'page_title': f'CircleCI Build #{build_number} - Live Status',
                     'content': f'''
 ## 🚀 CircleCI Pipeline Triggered - Live Status
@@ -1052,11 +1046,7 @@ async def test_support(request: TestRequest, req: Request):
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
         circleci_params = {
-            "test_type": "strategy_generation",
-            "code_page": request.code_page_title,
-            "space_key": space_key,
-            "code_length": len(code_content),
-            "request_timestamp": datetime.now().isoformat()
+            "triggered_by": "test_support_tool"
         }
         
         circleci_result = trigger_circleci_pipeline("main", circleci_params)
