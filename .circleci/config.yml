@@ -7,65 +7,20 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Display Build Info
-          command: |
-            echo "🎯 CIRCLECI PIPELINE TRIGGERED BY TEST SUPPORT TOOL"
-            echo "=================================================="
-            echo "📅 Timestamp: $(date)"
-            echo "🔗 Build URL: $CIRCLE_BUILD_URL"
-            echo "📋 Job: $CIRCLE_JOB"
-            echo "🌿 Branch: $CIRCLE_BRANCH"
-            echo "🔢 Build #: $CIRCLE_BUILD_NUM"
-            echo "📝 Commit: $CIRCLE_SHA1"
-            echo "👤 Author: $CIRCLE_USERNAME"
-            echo ""
-            echo "🚀 This pipeline was triggered by clicking 'Generate Strategy'"
-            echo "   in the Test Support Tool. It will run comprehensive tests"
-            echo "   and post results to Confluence automatically."
-            echo ""
-            echo "🔗 LIVE DASHBOARD LINKS:"
-            echo "   - View this build: https://app.circleci.com/pipelines/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/$CIRCLE_BUILD_NUM"
-            echo "   - Project dashboard: https://app.circleci.com/pipelines/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-            echo ""
-            echo "📊 REAL-TIME VISIBILITY:"
-            echo "   - Refresh CircleCI dashboard to see live test execution"
-            echo "   - Watch logs update in real-time"
-            echo "   - See test results as they complete"
-            echo ""
+          name: Show pipeline info
+          command: echo "🎯 CircleCI Pipeline triggered by Test Support Tool - Build #$CIRCLE_BUILD_NUM"
       - run:
           name: Install pytest
           command: pip install pytest
       - run:
-          name: Create test file
-          command: |
-            cat > test_basic.py << 'EOF'
-def test_basic():
-    assert 2 + 2 == 4
-    assert "hello" + " world" == "hello world"
-    assert [1, 2, 3] == [1, 2, 3]
-EOF
+          name: Create test
+          command: echo 'def test_basic(): assert 2 + 2 == 4' > test.py
       - run:
-          name: Run tests
-          command: |
-            echo "🚀 Starting Test Strategy Generation Pipeline"
-            echo "📋 Build Parameters:"
-            echo "  - Test Type: $CIRCLE_JOB"
-            echo "  - Branch: $CIRCLE_BRANCH"
-            echo "  - Commit: $CIRCLE_SHA1"
-            echo "  - Build Number: $CIRCLE_BUILD_NUM"
-            echo "  - Triggered by: Test Support Tool"
-            echo ""
-            echo "🔄 REAL-TIME STATUS: Tests are now running..."
-            echo "📊 You can see live progress at: https://app.circleci.com/pipelines/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/$CIRCLE_BUILD_NUM"
-            echo ""
-            python -m pytest test_basic.py -v
+          name: Run test
+          command: python -m pytest test.py -v
       - run:
-          name: Show completion
-          command: |
-            echo "📄 Posting results to Confluence..."
-            echo "✅ Test execution completed successfully!"
-            echo "📊 Build #$CIRCLE_BUILD_NUM finished"
-            echo "🔗 View results at: https://app.circleci.com/pipelines/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/$CIRCLE_BUILD_NUM"
+          name: Show success
+          command: echo "✅ Test completed successfully! Build #$CIRCLE_BUILD_NUM"
 
 workflows:
   version: 2
