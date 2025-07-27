@@ -80,6 +80,7 @@ export interface TestResponse {
     state?: string;
     created_at?: string;
     error?: string;
+    setup_required?: boolean;
   };
 }
 
@@ -321,6 +322,20 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  async getCircleCIStatus(pipelineId: string): Promise<{
+    success: boolean;
+    pipeline_id?: string;
+    state?: string;
+    number?: number;
+    created_at?: string;
+    updated_at?: string;
+    workflows?: any[];
+    error?: string;
+    timestamp?: string;
+  }> {
+    return this.makeRequest(`/circleci-status/${pipelineId}`);
   }
 }
 

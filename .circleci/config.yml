@@ -316,4 +316,4 @@ workflows:
       - test-and-analyze
       - ai-enhanced-testing:
           requires:
-            - test-and-analyze 
+            - test-and-analyze

@@ -102,21 +102,21 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
     if (isPollingStatus && circleciPipeline?.pipeline_id) {
       interval = setInterval(async () => {
         try {
-          const response = await fetch(`/circleci-status/${circleciPipeline.pipeline_id}`);
-          const status = await response.json();
+          const status = await apiService.getCircleCIStatus(circleciPipeline.pipeline_id);
           
-          if (status.pipeline?.success) {
-            const pipeline = status.pipeline.pipeline;
-            setCircleciStatus(pipeline.state);
+          if (status.success) {
+            setCircleciStatus(status.state || 'running');
             
             // Add log entry
-            setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline ${pipeline.state}: ${pipeline.number}`]);
+            setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline ${status.state}: ${status.number}`]);
             
             // Stop polling if pipeline is finished
-            if (['finished', 'failed', 'canceled', 'error'].includes(pipeline.state)) {
+            if (['finished', 'failed', 'canceled', 'error'].includes(status.state || '')) {
               setIsPollingStatus(false);
-              setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline completed with status: ${pipeline.state}`]);
+              setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline completed with status: ${status.state}`]);
             }
+          } else {
+            console.error('Error polling CircleCI status:', status.error);
           }
         } catch (err) {
           console.error('Error polling CircleCI status:', err);
