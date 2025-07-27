@@ -742,6 +742,249 @@ Answer:"""
 # CircleCI integration is handled via the .circleci/config.yml file
 # which sends test results to /analyze-logs endpoint and posts to Confluence
 
+import requests
+import os
+import json
+from datetime import datetime
+import uuid
+
+# CircleCI API configuration
+CIRCLECI_API_TOKEN = os.getenv('CIRCLECI_API_TOKEN', 'your-circleci-token')
+CIRCLECI_PROJECT_SLUG = os.getenv('CIRCLECI_PROJECT_SLUG', 'github/your-username/your-repo')
+CIRCLECI_API_BASE = "https://circleci.com/api/v2"
+
+def trigger_circleci_pipeline(branch="main", parameters=None):
+    """Trigger a new CircleCI pipeline with enhanced visibility"""
+    try:
+        url = f"{CIRCLECI_API_BASE}/project/{CIRCLECI_PROJECT_SLUG}/pipeline"
+        
+        headers = {
+            "Circle-Token": CIRCLECI_API_TOKEN,
+            "Content-Type": "application/json"
+        }
+        
+        # Enhanced parameters for better visibility
+        enhanced_params = {
+            "test_type": "strategy_generation",
+            "triggered_by": "test_support_tool",
+            "timestamp": datetime.now().isoformat(),
+            "request_id": str(uuid.uuid4()),
+            "visible_in_dashboard": True,
+            "show_live_logs": True,
+            "auto_post_to_confluence": True
+        }
+        
+        if parameters:
+            enhanced_params.update(parameters)
+        
+        payload = {
+            "branch": branch,
+            "parameters": enhanced_params
+        }
+        
+        print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
+        print(f"📋 Enhanced Parameters: {enhanced_params}")
+        print(f"🔗 CircleCI Dashboard URL: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}")
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 201:
+            pipeline_data = response.json()
+            pipeline_id = pipeline_data.get('id')
+            build_number = pipeline_data.get('number')
+            
+            print(f"✅ CircleCI pipeline triggered successfully!")
+            print(f"📋 Pipeline ID: {pipeline_id}")
+            print(f"🔢 Build Number: {build_number}")
+            print(f"🔗 Live Dashboard: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}/{build_number}")
+            print(f"📊 Build URL: https://app.circleci.com/pipelines/{pipeline_id}")
+            
+            # Send immediate notification to Confluence about the trigger
+            try:
+                confluence_notification = {
+                    'space_key': enhanced_params.get('space_key', 'TEST'),
+                    'page_title': f'CircleCI Build #{build_number} - Live Status',
+                    'content': f'''
+## 🚀 CircleCI Pipeline Triggered - Live Status
+
+### Build Information
+- **Build Number**: #{build_number}
+- **Pipeline ID**: `{pipeline_id}`
+- **Branch**: {branch}
+- **Triggered At**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- **Triggered By**: Test Support Tool
+
+### Live Links
+- **🔗 CircleCI Dashboard**: [View Live Build](https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}/{build_number})
+- **📊 Pipeline Details**: [Pipeline #{build_number}](https://app.circleci.com/pipelines/{pipeline_id})
+
+### Current Status
+🔄 **Status**: Pipeline triggered, tests starting...
+
+### What's Happening Now
+1. **Test Suite Execution**: Running comprehensive test suite
+2. **AI Analysis**: Analyzing test results with AI
+3. **Coverage Report**: Generating test coverage reports
+4. **Confluence Post**: Will post final results here
+
+### Real-time Updates
+This page will be updated as the pipeline progresses. Refresh to see latest status.
+
+---
+*Generated automatically by Test Support Tool with CircleCI integration*
+'''
+                }
+                
+                # Post immediate notification
+                confluence = init_confluence()
+                try:
+                    confluence.create_page(
+                        space=confluence_notification['space_key'],
+                        title=confluence_notification['page_title'],
+                        body=confluence_notification['content']
+                    )
+                    print(f"📄 Immediate notification posted to Confluence")
+                except Exception as e:
+                    print(f"⚠️ Could not post immediate notification: {e}")
+                    
+            except Exception as e:
+                print(f"⚠️ Notification setup failed: {e}")
+            
+            return {
+                "success": True,
+                "pipeline_id": pipeline_id,
+                "number": build_number,
+                "state": pipeline_data.get('state'),
+                "created_at": pipeline_data.get('created_at'),
+                "dashboard_url": f"https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}/{build_number}",
+                "pipeline_url": f"https://app.circleci.com/pipelines/{pipeline_id}"
+            }
+        else:
+            print(f"❌ Failed to trigger CircleCI pipeline: {response.status_code} - {response.text}")
+            return {
+                "success": False,
+                "error": f"CircleCI API returned {response.status_code}: {response.text}"
+            }
+            
+    except Exception as e:
+        print(f"❌ Error triggering CircleCI pipeline: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def get_circleci_pipeline_status(pipeline_id):
+    """Get the status of a CircleCI pipeline"""
+    try:
+        url = f"{CIRCLECI_API_BASE}/pipeline/{pipeline_id}"
+        
+        headers = {
+            "Circle-Token": CIRCLECI_API_TOKEN
+        }
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            pipeline_data = response.json()
+            return {
+                "success": True,
+                "pipeline": pipeline_data
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Failed to get pipeline status: {response.status_code}"
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def get_circleci_workflow_status(pipeline_id):
+    """Get the status of workflows in a CircleCI pipeline"""
+    try:
+        url = f"{CIRCLECI_API_BASE}/pipeline/{pipeline_id}/workflow"
+        
+        headers = {
+            "Circle-Token": CIRCLECI_API_TOKEN
+        }
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            workflows_data = response.json()
+            return {
+                "success": True,
+                "workflows": workflows_data.get('items', [])
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Failed to get workflow status: {response.status_code}"
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/trigger-circleci")
+async def trigger_circleci_endpoint(request: Request):
+    """Endpoint to trigger CircleCI pipeline"""
+    try:
+        data = await request.json()
+        branch = data.get('branch', 'main')
+        parameters = data.get('parameters', {})
+        
+        # Add timestamp and request ID for tracking
+        parameters['request_id'] = str(uuid.uuid4())
+        parameters['triggered_at'] = datetime.now().isoformat()
+        parameters['trigger_source'] = 'test-support-tool'
+        
+        result = trigger_circleci_pipeline(branch, parameters)
+        
+        if result['success']:
+            # Log the trigger for audit trail
+            print(f"📊 CircleCI Pipeline Triggered:")
+            print(f"   Pipeline ID: {result['pipeline_id']}")
+            print(f"   Branch: {branch}")
+            print(f"   Parameters: {parameters}")
+            print(f"   Timestamp: {datetime.now().isoformat()}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error in trigger-circleci endpoint: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/circleci-status/{pipeline_id}")
+async def get_circleci_status(pipeline_id: str):
+    """Get CircleCI pipeline and workflow status"""
+    try:
+        # Get pipeline status
+        pipeline_status = get_circleci_pipeline_status(pipeline_id)
+        
+        # Get workflow status
+        workflow_status = get_circleci_workflow_status(pipeline_id)
+        
+        return {
+            "pipeline": pipeline_status,
+            "workflows": workflow_status,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 # --- Test Support Route Update ---
 from fastapi import APIRouter, Request
 
@@ -749,7 +992,7 @@ from fastapi import APIRouter, Request
 
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
-    """Test Support Tool functionality"""
+    """Test Support Tool functionality with CircleCI integration"""
     try:
         api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
         genai.configure(api_key=api_key)
@@ -771,6 +1014,22 @@ async def test_support(request: TestRequest, req: Request):
         code_content = code_data["body"]["storage"]["value"]
         
         print(f"Code content length: {len(code_content)}")  # Debug log
+        
+        # 🚀 TRIGGER CIRCLECI PIPELINE
+        print("🚀 Triggering CircleCI pipeline for test strategy generation...")
+        circleci_params = {
+            "test_type": "strategy_generation",
+            "code_page": request.code_page_title,
+            "space_key": space_key,
+            "code_length": len(code_content),
+            "request_timestamp": datetime.now().isoformat()
+        }
+        
+        circleci_result = trigger_circleci_pipeline("main", circleci_params)
+        
+        if not circleci_result['success']:
+            print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
+            # Continue with AI generation even if CircleCI fails
         
         # Generate test strategy
         prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
@@ -906,11 +1165,22 @@ Provide specific examples and code snippets for each category."""
         response_sensitivity = ai_model.generate_content(prompt_sensitivity)
         sensitivity_content = response_sensitivity.text
         
-        return {
+        # Prepare response with CircleCI information
+        result = {
             "strategy": strategy_content,
             "cross_platform": cross_platform_content,
-            "sensitivity": sensitivity_content
+            "sensitivity": sensitivity_content,
+            "circleci_trigger": circleci_result
         }
+        
+        # Log the complete operation
+        print(f"✅ Test strategy generation completed:")
+        print(f"   CircleCI Pipeline ID: {circleci_result.get('pipeline_id', 'N/A')}")
+        print(f"   Strategy Length: {len(strategy_content)} chars")
+        print(f"   Cross-Platform Length: {len(cross_platform_content)} chars")
+        print(f"   Sensitivity Length: {len(sensitivity_content)} chars")
+        
+        return result
         
     except Exception as e:
         print(f"Error in test support: {e}")

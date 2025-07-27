@@ -16,6 +16,14 @@ interface TestReport {
   strategy?: string;
   crossPlatform?: string;
   sensitivity?: string;
+  circleci_trigger?: {
+    success: boolean;
+    pipeline_id?: string;
+    number?: number;
+    state?: string;
+    created_at?: string;
+    error?: string;
+  };
 }
 
 interface TestMetrics {
@@ -52,6 +60,12 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
   const [testMetrics, setTestMetrics] = useState<TestMetrics | null>(null);
   const [testRecommendations, setTestRecommendations] = useState<TestRecommendations | null>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  
+  // Enhanced CircleCI state
+  const [circleciPipeline, setCircleciPipeline] = useState<any>(null);
+  const [circleciStatus, setCircleciStatus] = useState<string>('idle');
+  const [circleciLogs, setCircleciLogs] = useState<string[]>([]);
+  const [isPollingStatus, setIsPollingStatus] = useState(false);
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -80,6 +94,40 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
       loadPages();
     }
   }, [selectedSpace]);
+
+  // Poll CircleCI status when pipeline is active
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isPollingStatus && circleciPipeline?.pipeline_id) {
+      interval = setInterval(async () => {
+        try {
+          const response = await fetch(`/circleci-status/${circleciPipeline.pipeline_id}`);
+          const status = await response.json();
+          
+          if (status.pipeline?.success) {
+            const pipeline = status.pipeline.pipeline;
+            setCircleciStatus(pipeline.state);
+            
+            // Add log entry
+            setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline ${pipeline.state}: ${pipeline.number}`]);
+            
+            // Stop polling if pipeline is finished
+            if (['finished', 'failed', 'canceled', 'error'].includes(pipeline.state)) {
+              setIsPollingStatus(false);
+              setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline completed with status: ${pipeline.state}`]);
+            }
+          }
+        } catch (err) {
+          console.error('Error polling CircleCI status:', err);
+        }
+      }, 5000); // Poll every 5 seconds
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPollingStatus, circleciPipeline]);
 
   const loadSpaces = async () => {
     try {
@@ -111,9 +159,14 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
 
     setIsGenerating('strategy');
     setError('');
+    
+    // Reset CircleCI state
+    setCircleciPipeline(null);
+    setCircleciStatus('triggering');
+    setCircleciLogs([]);
 
     try {
-      console.log('Calling test support API for strategy...');
+      console.log('🚀 Calling test support API with CircleCI integration...');
       const result = await apiService.testSupport({
         space_key: selectedSpace,
         code_page_title: codePage,
@@ -122,6 +175,20 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
 
       console.log('Test support strategy response:', result);
 
+      // Handle CircleCI integration
+      const circleciTrigger = result.circleci_trigger;
+      if (circleciTrigger?.success) {
+        setCircleciPipeline(circleciTrigger);
+        setCircleciStatus('running');
+        setIsPollingStatus(true);
+        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🚀 CircleCI pipeline triggered!`]);
+        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 📋 Pipeline ID: ${circleciTrigger.pipeline_id}`]);
+        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] 🔗 Build #${circleciTrigger.number}`]);
+      } else {
+        setCircleciStatus('failed');
+        setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ CircleCI trigger failed: ${circleciTrigger?.error || 'Unknown error'}`]);
+      }
+
       setTestReport(prev => ({
         ...prev,
         strategy: result.strategy
@@ -129,6 +196,8 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
     } catch (err) {
       console.error('Test support strategy error:', err);
       setError('Failed to generate test strategy. Please try again.');
+      setCircleciStatus('failed');
+      setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ API call failed: ${err}`]);
       console.error('Error generating strategy:', err);
     } finally {
       setIsGenerating('');
@@ -582,6 +651,92 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
                         <span>Save to Confluence</span>
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* CircleCI Status Display */}
+                {(circleciPipeline || circleciStatus !== 'idle') && (
+                  <div className="pt-4 border-t border-white/20 space-y-3">
+                    <h4 className="font-semibold text-gray-800 flex items-center">
+                      <GitBranch className="w-4 h-4 mr-2" />
+                      CircleCI Pipeline
+                    </h4>
+                    
+                    {/* Pipeline Status */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Status:</span>
+                        <span className={`font-medium ${
+                          circleciStatus === 'running' ? 'text-blue-600' :
+                          circleciStatus === 'finished' ? 'text-green-600' :
+                          circleciStatus === 'failed' ? 'text-red-600' :
+                          circleciStatus === 'triggering' ? 'text-orange-600' :
+                          'text-gray-600'
+                        }`}>
+                          {circleciStatus === 'running' && <Loader2 className="w-3 h-3 inline animate-spin mr-1" />}
+                          {circleciStatus === 'finished' && <CheckCircle className="w-3 h-3 inline mr-1" />}
+                          {circleciStatus === 'failed' && <XCircle className="w-3 h-3 inline mr-1" />}
+                          {circleciStatus === 'triggering' && <Activity className="w-3 h-3 inline mr-1" />}
+                          {circleciStatus.charAt(0).toUpperCase() + circleciStatus.slice(1)}
+                        </span>
+                      </div>
+                      
+                      {circleciPipeline && (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Build #:</span>
+                            <span className="font-medium text-purple-600">#{circleciPipeline.number}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Pipeline ID:</span>
+                            <span className="font-medium text-gray-800 font-mono text-xs">
+                              {circleciPipeline.pipeline_id?.slice(-8)}...
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Created:</span>
+                            <span className="font-medium text-gray-800">
+                              {new Date(circleciPipeline.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Live Logs */}
+                    {circleciLogs.length > 0 && (
+                      <div className="mt-3">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">Live Logs:</h5>
+                        <div className="bg-gray-900 text-green-400 p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
+                          {circleciLogs.slice(-5).map((log, index) => (
+                            <div key={index} className="mb-1">{log}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* View in CircleCI Buttons */}
+                    {circleciPipeline && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => window.open(circleciPipeline.dashboard_url || `https://app.circleci.com/pipelines/${circleciPipeline.pipeline_id}`, '_blank')}
+                          className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                        >
+                          <Activity className="w-3 h-3" />
+                          <span>🚀 View Live Build</span>
+                        </button>
+                        <button
+                          onClick={() => window.open(`https://app.circleci.com/pipelines/${circleciPipeline.pipeline_id}`, '_blank')}
+                          className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gray-800 text-white rounded text-sm hover:bg-gray-700 transition-colors"
+                        >
+                          <GitBranch className="w-3 h-3" />
+                          <span>📊 Pipeline Details</span>
+                        </button>
+                        <div className="text-xs text-gray-600 text-center">
+                          💡 Refresh CircleCI dashboard to see live test execution
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

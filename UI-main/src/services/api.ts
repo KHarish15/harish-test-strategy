@@ -73,6 +73,14 @@ export interface TestResponse {
   cross_platform: string;
   sensitivity?: string;
   ai_response?: string;
+  circleci_trigger?: {
+    success: boolean;
+    pipeline_id?: string;
+    number?: number;
+    state?: string;
+    created_at?: string;
+    error?: string;
+  };
 }
 
 export interface ExportResponse {
