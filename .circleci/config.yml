@@ -8,19 +8,19 @@ jobs:
       - checkout
       - run:
           name: Show pipeline info
-          command: echo "🎯 CircleCI Pipeline triggered by Test Support Tool - Build #$CIRCLE_BUILD_NUM"
+          command: echo "CircleCI Pipeline triggered by Test Support Tool"
       - run:
           name: Install pytest
           command: pip install pytest
       - run:
-          name: Create test
-          command: echo 'def test_basic(): assert 2 + 2 == 4' > test.py
+          name: Create test file
+          command: echo "def test_basic(): assert 2 + 2 == 4" > test.py
       - run:
           name: Run test
           command: python -m pytest test.py -v
       - run:
           name: Show success
-          command: echo "✅ Test completed successfully! Build #$CIRCLE_BUILD_NUM"
+          command: echo "Test completed successfully"
 
 workflows:
   version: 2
