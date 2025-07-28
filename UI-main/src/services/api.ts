@@ -156,6 +156,30 @@ export interface SaveToConfluenceResponse {
   message?: string;
 }
 
+export interface MeetingNotesRequest {
+  space_key: string;
+  page_title: string;
+  meeting_notes: string;
+  confluence_page_id?: string;
+  confluence_space_key?: string;
+}
+
+export interface MeetingNotesResponse {
+  tasks: Array<{
+    task: string;
+    assignee: string;
+    due: string;
+    jira_key?: string;
+    jira_link?: string;
+  }>;
+  total_tasks: number;
+  jira_issues_created: number;
+  confluence_updated: boolean;
+  slack_notifications_sent: number;
+  page_title: string;
+  space_key: string;
+}
+
 export interface FlowchartResponse {
   image_base64: string;
   mime_type: string;
@@ -336,6 +360,13 @@ class ApiService {
     timestamp?: string;
   }> {
     return this.makeRequest(`/circleci-status/${pipelineId}`);
+  }
+
+  async meetingNotesExtractor(request: MeetingNotesRequest): Promise<MeetingNotesResponse> {
+    return this.makeRequest<MeetingNotesResponse>('/meeting-notes-extractor', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
   }
 }
 

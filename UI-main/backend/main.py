@@ -112,6 +112,13 @@ class SaveToConfluenceRequest(BaseModel):
     mode: Optional[str] = "append"  # "append", "overwrite", "replace_section"
     heading_text: Optional[str] = None  # Used if mode == "replace_section"
 
+class MeetingNotesRequest(BaseModel):
+    space_key: str
+    page_title: str
+    meeting_notes: str
+    confluence_page_id: Optional[str] = None
+    confluence_space_key: Optional[str] = None
+
 # Helper functions
 def remove_emojis(text):
     emoji_pattern = re.compile(
@@ -1866,32 +1873,184 @@ async def preview_save_to_confluence(request: SaveToConfluenceRequest, req: Requ
 
 @app.post("/flowchart-generator")
 async def flowchart_generator(space_key: Optional[str] = Body(None), page_title: str = Body(...), req: Request = None):
-    """
-    Generate a flowchart from the content of a Confluence page and return the PNG image as base64.
-    """
+    """Generate flowchart from Confluence page content"""
     try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key')) if req else None
-        if api_key:
-            genai.configure(api_key=api_key)
         confluence = init_confluence()
         space_key = auto_detect_space(confluence, space_key)
+        
         # Get page content
         pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=100)
-        page = next((p for p in pages if p["title"].strip().lower() == page_title.strip().lower()), None)
-        if not page:
-            raise HTTPException(status_code=404, detail=f"Page '{page_title}' not found")
-        page_id = page["id"]
-        html_content = confluence.get_page_by_id(page_id=page_id, expand="body.storage")["body"]["storage"]["value"]
-        # Extract text content
-        text_content = BeautifulSoup(html_content, "html.parser").get_text(separator="\n")
-        # Generate flowchart image
-        img_bytes = generate_flowchart_image(text_content)
-        img_base64 = base64.b64encode(img_bytes).decode()
-        return {"image_base64": img_base64, "mime_type": "image/png", "filename": f"{page_title}_flowchart.png"}
+        selected_page = next((p for p in pages if p["title"] == page_title), None)
+        if not selected_page:
+            raise HTTPException(status_code=400, detail="Page not found")
+        
+        page_content = confluence.get_page_by_id(selected_page["id"], expand="body.storage")
+        content = page_content["body"]["storage"]["value"]
+        
+        # Clean HTML content
+        soup = BeautifulSoup(content, 'html.parser')
+        text_content = soup.get_text()
+        
+        # Generate flowchart
+        flowchart_image = generate_flowchart_image(text_content)
+        
+        return {
+            "flowchart_image": flowchart_image,
+            "page_title": page_title,
+            "space_key": space_key
+        }
     except Exception as e:
-        print("Error in /flowchart-generator:", str(e))
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to generate flowchart: {str(e)}")
+
+@app.post("/meeting-notes-extractor")
+async def meeting_notes_extractor(request: MeetingNotesRequest, req: Request):
+    """Extract action items from meeting notes and create Jira issues, update Confluence, and notify Slack"""
+    try:
+        # Initialize Gemini AI
+        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
+        genai.configure(api_key=api_key)
+        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
+        
+        # Extract tasks using Gemini AI
+        prompt = f"""
+You are an assistant extracting action items from meeting notes.
+
+Please respond ONLY with a JSON array in this exact format, without any extra text or explanation:
+[
+  {{
+    "task": "Task description",
+    "assignee": "Person responsible",
+    "due": "YYYY-MM-DD"
+  }}
+]
+
+Meeting Notes:
+{request.meeting_notes}
+"""
+        
+        response = ai_model.generate_content(prompt)
+        output = response.text.strip()
+        
+        # Clean up the response
+        if output.startswith("```"):
+            output = output.split("```")[1].strip()
+            if output.lower().startswith("json"):
+                output = "\n".join(output.split("\n")[1:]).strip()
+        
+        tasks = json.loads(output)
+        
+        # Initialize Confluence
+        confluence = init_confluence()
+        space_key = auto_detect_space(confluence, request.space_key)
+        
+        # Process each task
+        processed_tasks = []
+        
+        for task in tasks:
+            try:
+                # Create Jira issue using existing jira_utils
+                issue_key = create_jira_issue(
+                    summary=task["task"],
+                    description=f"Auto-created from meeting notes. Due: {task['due']}",
+                    issue_type="Task"
+                )
+                
+                if issue_key:
+                    # Get Jira issue details
+                    jira_base_url = os.getenv('JIRA_BASE_URL')
+                    jira_link = f"{jira_base_url}/browse/{issue_key}"
+                    
+                    # Add Jira link to task
+                    task_with_link = {**task, "jira_key": issue_key, "jira_link": jira_link}
+                    processed_tasks.append(task_with_link)
+                    
+                    # Send Slack notification using existing slack_utils
+                    slack_message = f"""
+📝 *New AI Task Created!*
+*Task:* {task['task']}
+*Assignee:* {task['assignee']}
+*Due:* {task['due']}
+🔗 *Jira:* <{jira_link}|{issue_key}>
+"""
+                    send_slack_message(slack_message)
+                else:
+                    # Task without Jira link
+                    task_with_link = {**task, "jira_key": None, "jira_link": None}
+                    processed_tasks.append(task_with_link)
+                    
+            except Exception as e:
+                print(f"Error processing task {task['task']}: {e}")
+                # Add task without Jira integration
+                task_with_link = {**task, "jira_key": None, "jira_link": None}
+                processed_tasks.append(task_with_link)
+        
+        # Update Confluence page with results
+        confluence_page_id = request.confluence_page_id
+        confluence_space_key = request.confluence_space_key or space_key
+        
+        if confluence_page_id:
+            try:
+                # Get next version number
+                auth = base64.b64encode(f"{os.getenv('CONFLUENCE_USER_EMAIL')}:{os.getenv('CONFLUENCE_API_KEY')}".encode()).decode()
+                res = requests.get(
+                    f"{os.getenv('CONFLUENCE_BASE_URL')}/rest/api/content/{confluence_page_id}",
+                    headers={"Authorization": f"Basic {auth}"}
+                )
+                next_version = 1
+                if res.status_code == 200:
+                    next_version = res.json()["version"]["number"] + 1
+                
+                # Create HTML table
+                table_html = "<table><tr><th>Task</th><th>Assignee</th><th>Due</th><th>Jira</th></tr>"
+                for task in processed_tasks:
+                    link_html = f"<a href='{task.get('jira_link', '#')}' target='_blank'>View</a>" if task.get('jira_link') else "—"
+                    table_html += f"<tr><td>{task['task']}</td><td>{task['assignee']}</td><td>{task['due']}</td><td>{link_html}</td></tr>"
+                table_html += "</table>"
+                
+                # Update Confluence page
+                headers = {
+                    "Authorization": f"Basic {auth}",
+                    "Content-Type": "application/json"
+                }
+                
+                payload = {
+                    "version": {"number": next_version},
+                    "title": f"Action Items - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                    "type": "page",
+                    "body": {
+                        "storage": {
+                            "value": table_html,
+                            "representation": "storage"
+                        }
+                    }
+                }
+                
+                response = requests.put(
+                    f"{os.getenv('CONFLUENCE_BASE_URL')}/rest/api/content/{confluence_page_id}",
+                    headers=headers,
+                    json=payload
+                )
+                
+                confluence_updated = response.status_code == 200
+                
+            except Exception as e:
+                print(f"Error updating Confluence: {e}")
+                confluence_updated = False
+        else:
+            confluence_updated = False
+        
+        return {
+            "tasks": processed_tasks,
+            "total_tasks": len(processed_tasks),
+            "jira_issues_created": len([t for t in processed_tasks if t.get('jira_key')]),
+            "confluence_updated": confluence_updated,
+            "slack_notifications_sent": len(processed_tasks),
+            "page_title": request.page_title,
+            "space_key": space_key
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to extract meeting notes: {str(e)}")
 
 @app.get("/test")
 async def test_endpoint():
