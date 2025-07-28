@@ -63,7 +63,6 @@ const VideoSummarizer: React.FC<VideoSummarizerProps> = ({ onClose, onFeatureSel
     { id: 'code' as const, label: 'Code Assistant', icon: Code },
     { id: 'impact' as const, label: 'Impact Analyzer', icon: TrendingUp },
     { id: 'test' as const, label: 'Test Support Tool', icon: TestTube },
-    { id: 'image' as const, label: 'Image Insights & Chart Builder', icon: Image },
   ];
 
   // Load spaces on component mount
@@ -146,10 +145,13 @@ const VideoSummarizer: React.FC<VideoSummarizerProps> = ({ onClose, onFeatureSel
           const newVideo: VideoContent = {
             id: Date.now().toString() + i, // Ensure unique IDs
             name: page,
-            summary: result.summary,
-            quotes: result.quotes,
-            timestamps: result.timestamps,
-            qa: result.qa
+            summary: String(result.summary || ''),
+            quotes: Array.isArray(result.quotes) ? result.quotes.map(q => String(q)) : [],
+            timestamps: Array.isArray(result.timestamps) ? result.timestamps.map(t => String(t)) : [],
+            qa: Array.isArray(result.qa) ? result.qa.map(qa => ({
+              question: String(qa.question || ''),
+              answer: String(qa.answer || '')
+            })) : []
           };
           
           setVideos(prev => [...prev, newVideo]);
@@ -190,7 +192,10 @@ const VideoSummarizer: React.FC<VideoSummarizerProps> = ({ onClose, onFeatureSel
         v.id === selectedVideo 
           ? { 
               ...v, 
-              qa: [...(v.qa || []), { question: newQuestion, answer: answer }]
+              qa: [...(v.qa || []), { 
+                question: String(newQuestion), 
+                answer: String(answer) 
+              }]
             } 
           : v
       ));
@@ -295,12 +300,21 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
         meeting_notes: summary
       });
 
-      setExtractedTasks(result.tasks);
+      // Ensure tasks are properly formatted and don't contain objects
+      const safeTasks = Array.isArray(result.tasks) ? result.tasks.map(task => ({
+        task: String(task.task || ''),
+        assignee: String(task.assignee || ''),
+        due: String(task.due || ''),
+        jira_key: task.jira_key ? String(task.jira_key) : undefined,
+        jira_link: task.jira_link ? String(task.jira_link) : undefined
+      })) : [];
+
+      setExtractedTasks(safeTasks);
       setExtractionResults({
-        total_tasks: result.total_tasks,
-        jira_issues_created: result.jira_issues_created,
-        confluence_updated: result.confluence_updated,
-        slack_notifications_sent: result.slack_notifications_sent
+        total_tasks: Number(result.total_tasks) || 0,
+        jira_issues_created: Number(result.jira_issues_created) || 0,
+        confluence_updated: Boolean(result.confluence_updated),
+        slack_notifications_sent: Number(result.slack_notifications_sent) || 0
       });
     } catch (err) {
       setError('Failed to extract tasks from video summary. Please try again.');
@@ -339,11 +353,12 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
         confluence_space_key: selectedSpace
       });
 
+      // Ensure all values are properly typed to prevent React rendering errors
       setExtractionResults({
-        total_tasks: result.total_tasks,
-        jira_issues_created: result.jira_issues_created,
-        confluence_updated: result.confluence_updated,
-        slack_notifications_sent: result.slack_notifications_sent
+        total_tasks: Number(result.total_tasks) || 0,
+        jira_issues_created: Number(result.jira_issues_created) || 0,
+        confluence_updated: Boolean(result.confluence_updated),
+        slack_notifications_sent: Number(result.slack_notifications_sent) || 0
       });
 
       setShowToast(true);

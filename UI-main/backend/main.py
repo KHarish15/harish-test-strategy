@@ -35,7 +35,7 @@ app = FastAPI(title="Confluence AI Assistant API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://frontend-u3s5.onrender.com",  # your frontend domain
+        "https://frontend-v2ah.onrender.com",  # your frontend domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
