@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 
 # Configuration
-BACKEND_URL = "https://backend-az2r.onrender.com"
+BACKEND_URL = "https://backend-i2dk.onrender.com"
 
 def demo_realtime_visibility():
     """Demonstrate real-time CircleCI visibility"""
