@@ -278,10 +278,10 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
     }
   };
 
-  // Meeting Notes Extractor Functions
-  const extractTasks = async () => {
-    if (!meetingNotes.trim()) {
-      setError('Please enter meeting notes to extract tasks.');
+  // Meeting Notes Extractor Functions (integrated into video summary)
+  const extractTasksFromSummary = async (summary: string) => {
+    if (!summary.trim()) {
+      setError('No video summary available to extract tasks from.');
       return;
     }
 
@@ -291,8 +291,8 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
     try {
       const result = await apiService.meetingNotesExtractor({
         space_key: selectedSpace,
-        page_title: 'Meeting Notes Extractor',
-        meeting_notes: meetingNotes
+        page_title: 'Video Summary Extractor',
+        meeting_notes: summary
       });
 
       setExtractedTasks(result.tasks);
@@ -303,14 +303,14 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
         slack_notifications_sent: result.slack_notifications_sent
       });
     } catch (err) {
-      setError('Failed to extract tasks. Please try again.');
-      console.error('Error extracting tasks:', err);
+      setError('Failed to extract tasks from video summary. Please try again.');
+      console.error('Error extracting tasks from summary:', err);
     } finally {
       setIsExtracting(false);
     }
   };
 
-  const pushToSystems = async () => {
+  const pushToSystemsFromSummary = async (summary: string) => {
     if (extractedTasks.length === 0) {
       setError('No tasks to push. Please extract tasks first.');
       return;
@@ -328,14 +328,13 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
       }
 
       // Extract page ID from URL - this is a simplified approach
-      // In a real implementation, you might want to get this from the Confluence macro context
       const urlParams = new URLSearchParams(window.location.search);
       const pageId = urlParams.get('pageId') || '34275380'; // Fallback to your page ID
 
       const result = await apiService.meetingNotesExtractor({
         space_key: selectedSpace,
-        page_title: 'Meeting Notes Extractor',
-        meeting_notes: meetingNotes,
+        page_title: 'Video Summary Extractor',
+        meeting_notes: summary,
         confluence_page_id: pageId,
         confluence_space_key: selectedSpace
       });
@@ -357,8 +356,7 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
     }
   };
 
-  const clearMeetingNotes = () => {
-    setMeetingNotes('');
+  const clearExtractedTasks = () => {
     setExtractedTasks([]);
     setExtractionResults(null);
     setError('');
@@ -404,32 +402,6 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
               );
             })}
           </div>
-
-          {/* Tab Navigation */}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={() => setActiveTab('video')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg backdrop-blur-sm border transition-all duration-200 ${
-                activeTab === 'video'
-                  ? 'bg-white/90 text-confluence-blue shadow-lg border-white/30'
-                  : 'bg-white/10 text-white hover:bg-white/20 border-white/10'
-              }`}
-            >
-              <Video className="w-4 h-4" />
-              <span className="text-sm font-medium">Video Summarizer</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('meeting')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg backdrop-blur-sm border transition-all duration-200 ${
-                activeTab === 'meeting'
-                  ? 'bg-white/90 text-confluence-blue shadow-lg border-white/30'
-                  : 'bg-white/10 text-white hover:bg-white/20 border-white/10'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span className="text-sm font-medium">Meeting Notes Extractor</span>
-            </button>
-          </div>
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
@@ -439,534 +411,481 @@ ${video.qa?.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
             </div>
           )}
 
-          {/* Video Summarizer Tab */}
-          {activeTab === 'video' && (
-            <>
-              {/* Video Selection Section */}
-              <div className="mb-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4">Select Video Content</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Space Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Confluence Space
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={selectedSpace}
-                        onChange={(e) => setSelectedSpace(e.target.value)}
-                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
-                      >
-                        <option value="">Choose a space...</option>
-                        {spaces.map(space => (
-                          <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          {/* Video Selection Section */}
+          <div className="mb-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+            <h3 className="font-semibold text-gray-800 mb-4">Select Video Content</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Space Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Confluence Space
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedSpace}
+                    onChange={(e) => setSelectedSpace(e.target.value)}
+                    className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
+                  >
+                    <option value="">Choose a space...</option>
+                    {spaces.map(space => (
+                      <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                </div>
+              </div>
+
+              {/* Page Selection - Aesthetic Multiselect */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Video Pages ({selectedPages.length} selected)
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsPageDropdownOpen(!isPageDropdownOpen)}
+                    disabled={!selectedSpace}
+                    className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue bg-white/70 backdrop-blur-sm text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <span className={selectedPages.length === 0 ? 'text-gray-500' : 'text-gray-700'}>
+                      {selectedPages.length === 0 
+                        ? 'Choose pages...' 
+                        : selectedPages.length === 1 
+                          ? selectedPages[0]
+                          : `${selectedPages.length} pages selected`
+                      }
+                    </span>
+                    {isPageDropdownOpen ? (
+                      <ChevronUp className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
+
+                  {/* Dropdown */}
+                  {isPageDropdownOpen && selectedSpace && (
+                    <div className="absolute z-10 w-full mt-1 bg-white/95 backdrop-blur-xl border border-white/30 rounded-lg shadow-xl max-h-60 overflow-hidden">
+                      {/* Header with Select All/Clear All */}
+                      <div className="p-3 border-b border-white/20 bg-white/50">
+                        <div className="flex justify-between items-center">
+                          <button
+                            onClick={selectAllPages}
+                            className="text-sm text-confluence-blue hover:text-confluence-blue/80 font-medium"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            onClick={clearAllPages}
+                            className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Page List */}
+                      <div className="max-h-48 overflow-y-auto">
+                        {pages.length === 0 ? (
+                          <div className="p-3 text-gray-500 text-sm text-center">
+                            No pages found in this space
+                          </div>
+                        ) : (
+                          pages.map(page => (
+                            <label
+                              key={page}
+                              className="flex items-center space-x-3 p-3 hover:bg-white/50 cursor-pointer border-b border-white/10 last:border-b-0"
+                            >
+                              <div className="relative">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPages.includes(page)}
+                                  onChange={() => handlePageSelection(page)}
+                                  className="sr-only"
+                                />
+                                <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
+                                  selectedPages.includes(page)
+                                    ? 'bg-confluence-blue border-confluence-blue'
+                                    : 'border-gray-300 hover:border-confluence-blue/50'
+                                }`}>
+                                  {selectedPages.includes(page) && (
+                                    <Check className="w-3 h-3 text-white" />
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-sm text-gray-700 flex-1">{page}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={processVideos}
+              disabled={!selectedSpace || selectedPages.length === 0 || isProcessing}
+              className="mt-4 w-full bg-confluence-blue/90 backdrop-blur-sm text-white py-3 px-4 rounded-lg hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors border border-white/10"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing Videos...</span>
+                </>
+              ) : (
+                <>
+                  <Video className="w-5 h-5" />
+                  <span>Process {selectedPages.length} Video{selectedPages.length !== 1 ? 's' : ''}</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Videos List */}
+          <div className="space-y-4">
+            {videos.map(video => (
+              <div key={video.id} className="border border-white/30 rounded-xl overflow-hidden bg-white/60 backdrop-blur-xl shadow-lg">
+                <div 
+                  className="p-4 bg-white/50 backdrop-blur-sm cursor-pointer hover:bg-white/70 transition-colors"
+                  onClick={() => setExpandedVideo(expandedVideo === video.id ? null : video.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-confluence-light-blue/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/20">
+                        <Video className="w-6 h-6 text-confluence-blue" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800">{video.name}</h4>
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span>Processed</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-green-100/80 backdrop-blur-sm text-green-800 border border-white/20">
+                            Completed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); exportSummary(video, exportFormat); }}
+                          className="px-3 py-1 bg-confluence-blue/90 backdrop-blur-sm text-white rounded text-sm hover:bg-confluence-blue transition-colors border border-white/10"
+                        >
+                          Export
+                        </button>
+                      </div>
+                      {expandedVideo === video.id ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                     </div>
                   </div>
+                </div>
 
-                  {/* Page Selection - Aesthetic Multiselect */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Video Pages ({selectedPages.length} selected)
-                    </label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsPageDropdownOpen(!isPageDropdownOpen)}
-                        disabled={!selectedSpace}
-                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue bg-white/70 backdrop-blur-sm text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <span className={selectedPages.length === 0 ? 'text-gray-500' : 'text-gray-700'}>
-                          {selectedPages.length === 0 
-                            ? 'Choose pages...' 
-                            : selectedPages.length === 1 
-                              ? selectedPages[0]
-                              : `${selectedPages.length} pages selected`
-                          }
-                        </span>
-                        {isPageDropdownOpen ? (
-                          <ChevronUp className="w-5 h-5 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="w-5 h-5 text-gray-400" />
-                        )}
-                      </button>
+                {expandedVideo === video.id && (
+                  <div className="border-t border-white/20 bg-white/40 backdrop-blur-xl">
+                    <div className="p-6 space-y-6">
+                      {/* Summary */}
+                      <div>
+                        <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
+                        <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                          <p className="text-gray-700">{video.summary}</p>
+                        </div>
+                        
+                        {/* Extract Action Items from Summary */}
+                        <div className="mt-4 flex space-x-2">
+                          <button
+                            onClick={() => extractTasksFromSummary(video.summary || '')}
+                            disabled={!video.summary || isExtracting}
+                            className="px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border border-white/10 flex items-center space-x-2"
+                          >
+                            {isExtracting ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Extracting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-4 h-4" />
+                                <span>Extract Action Items</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={clearExtractedTasks}
+                            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
 
-                      {/* Dropdown */}
-                      {isPageDropdownOpen && selectedSpace && (
-                        <div className="absolute z-10 w-full mt-1 bg-white/95 backdrop-blur-xl border border-white/30 rounded-lg shadow-xl max-h-60 overflow-hidden">
-                          {/* Header with Select All/Clear All */}
-                          <div className="p-3 border-b border-white/20 bg-white/50">
-                            <div className="flex justify-between items-center">
-                              <button
-                                onClick={selectAllPages}
-                                className="text-sm text-confluence-blue hover:text-confluence-blue/80 font-medium"
-                              >
-                                Select All
-                              </button>
-                              <button
-                                onClick={clearAllPages}
-                                className="text-sm text-gray-500 hover:text-gray-700 font-medium"
-                              >
-                                Clear All
-                              </button>
-                            </div>
+                      {/* Extracted Tasks */}
+                      {extractedTasks.length > 0 && (
+                        <div>
+                          <h5 className="font-semibold text-gray-800 mb-3">Extracted Action Items</h5>
+                          <div className="space-y-3">
+                            {extractedTasks.map((task, index) => (
+                              <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-4 mb-2">
+                                      <div className="flex items-center space-x-2">
+                                        <Users className="w-4 h-4 text-gray-500" />
+                                        <span className="text-sm font-medium text-gray-700">{task.assignee}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <Calendar className="w-4 h-4 text-gray-500" />
+                                        <span className="text-sm text-gray-600">{task.due}</span>
+                                      </div>
+                                    </div>
+                                    <p className="text-gray-800 font-medium">{task.task}</p>
+                                    {task.jira_key && (
+                                      <div className="mt-2 flex items-center space-x-2">
+                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Jira: {task.jira_key}</span>
+                                        {task.jira_link && (
+                                          <a
+                                            href={task.jira_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                                          >
+                                            <ExternalLink className="w-3 h-3" />
+                                            <span>View</span>
+                                          </a>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Push to Systems Button */}
+                          <div className="mt-4">
+                            <button
+                              onClick={() => pushToSystemsFromSummary(video.summary || '')}
+                              disabled={isPushing}
+                              className="px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border border-white/10 flex items-center space-x-2"
+                            >
+                              {isPushing ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  <span>Pushing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="w-4 h-4" />
+                                  <span>Push to Jira + Confluence + Slack</span>
+                                </>
+                              )}
+                            </button>
                           </div>
 
-                          {/* Page List */}
-                          <div className="max-h-48 overflow-y-auto">
-                            {pages.length === 0 ? (
-                              <div className="p-3 text-gray-500 text-sm text-center">
-                                No pages found in this space
+                          {/* Results Summary */}
+                          {extractionResults && (
+                            <div className="mt-4 p-4 bg-green-50/80 backdrop-blur-sm rounded-lg border border-green-200">
+                              <h4 className="font-semibold text-green-800 mb-2">Integration Results</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div className="text-center">
+                                  <div className="font-bold text-green-800">{extractionResults.total_tasks}</div>
+                                  <div className="text-green-600">Total Tasks</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-bold text-blue-800">{extractionResults.jira_issues_created}</div>
+                                  <div className="text-blue-600">Jira Issues</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-bold text-purple-800">{extractionResults.slack_notifications_sent}</div>
+                                  <div className="text-purple-600">Slack Notifications</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-bold text-orange-800">{extractionResults.confluence_updated ? 'Yes' : 'No'}</div>
+                                  <div className="text-orange-600">Confluence Updated</div>
+                                </div>
                               </div>
-                            ) : (
-                              pages.map(page => (
-                                <label
-                                  key={page}
-                                  className="flex items-center space-x-3 p-3 hover:bg-white/50 cursor-pointer border-b border-white/10 last:border-b-0"
-                                >
-                                  <div className="relative">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedPages.includes(page)}
-                                      onChange={() => handlePageSelection(page)}
-                                      className="sr-only"
-                                    />
-                                    <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${
-                                      selectedPages.includes(page)
-                                        ? 'bg-confluence-blue border-confluence-blue'
-                                        : 'border-gray-300 hover:border-confluence-blue/50'
-                                    }`}>
-                                      {selectedPages.includes(page) && (
-                                        <Check className="w-3 h-3 text-white" />
-                                      )}
-                                    </div>
-                                  </div>
-                                  <span className="text-sm text-gray-700 flex-1">{page}</span>
-                                </label>
-                              ))
-                            )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Key Quotes */}
+                      {video.quotes && video.quotes.length > 0 && (
+                        <div>
+                          <h5 className="font-semibold text-gray-800 mb-3">Key Quotes</h5>
+                          <div className="space-y-2">
+                            {video.quotes.map((quote, index) => (
+                              <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border-l-4 border-confluence-blue border border-white/20">
+                                <p className="text-gray-700 italic">"{quote}"</p>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
-                    </div>
-                  </div>
-                </div>
 
-                <button
-                  onClick={processVideos}
-                  disabled={!selectedSpace || selectedPages.length === 0 || isProcessing}
-                  className="mt-4 w-full bg-confluence-blue/90 backdrop-blur-sm text-white py-3 px-4 rounded-lg hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors border border-white/10"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Processing Videos...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Video className="w-5 h-5" />
-                      <span>Process {selectedPages.length} Video{selectedPages.length !== 1 ? 's' : ''}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Videos List */}
-              <div className="space-y-4">
-                {videos.map(video => (
-                  <div key={video.id} className="border border-white/30 rounded-xl overflow-hidden bg-white/60 backdrop-blur-xl shadow-lg">
-                    <div 
-                      className="p-4 bg-white/50 backdrop-blur-sm cursor-pointer hover:bg-white/70 transition-colors"
-                      onClick={() => setExpandedVideo(expandedVideo === video.id ? null : video.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-confluence-light-blue/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/20">
-                            <Video className="w-6 h-6 text-confluence-blue" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-800">{video.name}</h4>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>Processed</span>
-                              <span className="px-2 py-1 rounded-full text-xs bg-green-100/80 backdrop-blur-sm text-green-800 border border-white/20">
-                                Completed
-                              </span>
-                            </div>
+                      {/* Timestamps Section */}
+                      {video.timestamps && video.timestamps.length > 0 && (
+                        <div>
+                          <h5 className="font-semibold text-gray-800 mb-3">Timestamps</h5>
+                          <div className="space-y-2">
+                            {video.timestamps.map((ts, index) => (
+                              <div
+                                key={index}
+                                className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border-l-4 border-yellow-500 border border-white/20"
+                              >
+                                <p className="text-gray-700">{ts}</p>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="flex space-x-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); exportSummary(video, exportFormat); }}
-                              className="px-3 py-1 bg-confluence-blue/90 backdrop-blur-sm text-white rounded text-sm hover:bg-confluence-blue transition-colors border border-white/10"
-                            >
-                              Export
-                            </button>
-                          </div>
-                          {expandedVideo === video.id ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                        </div>
-                      </div>
-                    </div>
+                      )}
 
-                    {expandedVideo === video.id && (
-                      <div className="border-t border-white/20 bg-white/40 backdrop-blur-xl">
-                        <div className="p-6 space-y-6">
-                          {/* Summary */}
-                          <div>
-                            <h5 className="font-semibold text-gray-800 mb-3">AI Summary</h5>
-                            <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                              <p className="text-gray-700">{video.summary}</p>
-                            </div>
-                          </div>
-
-                          {/* Key Quotes */}
-                          {video.quotes && video.quotes.length > 0 && (
-                            <div>
-                              <h5 className="font-semibold text-gray-800 mb-3">Key Quotes</h5>
-                              <div className="space-y-2">
-                                {video.quotes.map((quote, index) => (
-                                  <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border-l-4 border-confluence-blue border border-white/20">
-                                    <p className="text-gray-700 italic">"{quote}"</p>
-                                  </div>
-                                ))}
-                              </div>
+                      {/* Q&A Section */}
+                      <div>
+                        <h5 className="font-semibold text-gray-800 mb-3">Questions & Answers</h5>
+                        <div className="space-y-4">
+                          {video.qa && video.qa.length > 0 && (
+                            <div className="space-y-3">
+                              {video.qa.map((qa, index) => (
+                                <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                                  <p className="font-medium text-gray-800 mb-2">Q: {qa.question}</p>
+                                  <p className="text-gray-700">A: {qa.answer}</p>
+                                </div>
+                              ))}
                             </div>
                           )}
-
-                          {/* Timestamps Section */}
-                          {video.timestamps && video.timestamps.length > 0 && (
-                            <div>
-                              <h5 className="font-semibold text-gray-800 mb-3">Timestamps</h5>
-                              <div className="space-y-2">
-                                {video.timestamps.map((ts, index) => (
-                                  <div
-                                    key={index}
-                                    className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border-l-4 border-yellow-500 border border-white/20"
-                                  >
-                                    <p className="text-gray-700">{ts}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Q&A Section */}
-                          <div>
-                            <h5 className="font-semibold text-gray-800 mb-3">Questions & Answers</h5>
-                            <div className="space-y-4">
-                              {video.qa && video.qa.length > 0 && (
-                                <div className="space-y-3">
-                                  {video.qa.map((qa, index) => (
-                                    <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                                      <p className="font-medium text-gray-800 mb-2">Q: {qa.question}</p>
-                                      <p className="text-gray-700">A: {qa.answer}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              
-                              {/* Add New Question */}
-                              <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                                <div className="flex space-x-2">
-                                  <input
-                                    type="text"
-                                    value={newQuestion}
-                                    onChange={(e) => setNewQuestion(e.target.value)}
-                                    placeholder="Ask a question about this video..."
-                                    className="flex-1 p-2 border border-white/30 rounded focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue bg-white/70 backdrop-blur-sm"
-                                    onKeyPress={(e) => e.key === 'Enter' && addQuestion()}
-                                  />
-                                  <button
-                                    onClick={() => {
-                                      setSelectedVideo(video.id);
-                                      addQuestion();
-                                    }}
-                                    disabled={isQALoading}
-                                    className="px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center border border-white/10"
-                                  >
-                                    {isQALoading ? (
-                                      <>
-                                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                        <span>Loading...</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <MessageSquare className="w-4 h-4 mr-1" />
-                                        <span>Ask</span>
-                                      </>
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Export Options */}
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <label className="text-sm font-medium text-gray-700">Export Format:</label>
-                              <select
-                                value={exportFormat}
-                                onChange={(e) => setExportFormat(e.target.value)}
-                                className="px-3 py-1 border border-white/30 rounded text-sm focus:ring-2 focus:ring-confluence-blue bg-white/70 backdrop-blur-sm"
-                              >
-                                <option value="markdown">Markdown</option>
-                                <option value="pdf">PDF</option>
-                                <option value="docx">Word Document</option>
-                                <option value="txt">Plain Text</option>
-                              </select>
-                            </div>
-                            
-                            <div className="flex space-x-2 pt-4 border-t border-white/20">
+                          
+                          {/* Add New Question */}
+                          <div className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                            <div className="flex space-x-2">
+                              <input
+                                type="text"
+                                value={newQuestion}
+                                onChange={(e) => setNewQuestion(e.target.value)}
+                                placeholder="Ask a question about this video..."
+                                className="flex-1 p-2 border border-white/30 rounded focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue bg-white/70 backdrop-blur-sm"
+                                onKeyPress={(e) => e.key === 'Enter' && addQuestion()}
+                              />
                               <button
-                                onClick={() => exportSummary(video, exportFormat)}
-                                className="flex items-center space-x-2 px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 transition-colors border border-white/10"
-                              >
-                                <Download className="w-4 h-4" />
-                                <span>Export</span>
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  const { space, page } = getConfluenceSpaceAndPageFromUrl();
-                                  if (!space || !page) {
-                                    alert('Confluence space or page not specified in macro src URL.');
-                                    return;
-                                  }
-                                  try {
-                                    await apiService.saveToConfluence({
-                                      space_key: space,
-                                      page_title: page,
-                                      content: video.summary || '',
-                                    });
-                                    setShowToast(true);
-                                    setTimeout(() => setShowToast(false), 3000);
-                                  } catch (err: any) {
-                                    alert('Failed to save to Confluence: ' + (err.message || err));
-                                  }
+                                onClick={() => {
+                                  setSelectedVideo(video.id);
+                                  addQuestion();
                                 }}
-                                className="flex items-center space-x-2 px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded-lg hover:bg-confluence-blue transition-colors border border-white/10"
+                                disabled={isQALoading}
+                                className="px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center border border-white/10"
                               >
-                                <Save className="w-4 h-4" />
-                                <span>Save to Confluence</span>
+                                {isQALoading ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                    <span>Loading...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <MessageSquare className="w-4 h-4 mr-1" />
+                                    <span>Ask</span>
+                                  </>
+                                )}
                               </button>
                             </div>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
 
-              {/* Bulk Export Section - Show when 2 or more videos */}
-              {videos.length >= 2 && (
-                <div className="mt-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-gray-800 mb-2">Export All Videos</h3>
-                      <p className="text-sm text-gray-600">Export all {videos.length} processed videos in a single file</p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <label className="text-sm font-medium text-gray-700">Format:</label>
-                        <select
-                          value={exportFormat}
-                          onChange={(e) => setExportFormat(e.target.value)}
-                          className="px-3 py-1 border border-white/30 rounded text-sm focus:ring-2 focus:ring-confluence-blue bg-white/70 backdrop-blur-sm"
-                        >
-                          <option value="markdown">Markdown</option>
-                          <option value="pdf">PDF</option>
-                          <option value="docx">Word Document</option>
-                          <option value="txt">Plain Text</option>
-                        </select>
+                      {/* Export Options */}
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <label className="text-sm font-medium text-gray-700">Export Format:</label>
+                          <select
+                            value={exportFormat}
+                            onChange={(e) => setExportFormat(e.target.value)}
+                            className="px-3 py-1 border border-white/30 rounded text-sm focus:ring-2 focus:ring-confluence-blue bg-white/70 backdrop-blur-sm"
+                          >
+                            <option value="markdown">Markdown</option>
+                            <option value="pdf">PDF</option>
+                            <option value="docx">Word Document</option>
+                            <option value="txt">Plain Text</option>
+                          </select>
+                        </div>
+                        
+                        <div className="flex space-x-2 pt-4 border-t border-white/20">
+                          <button
+                            onClick={() => exportSummary(video, exportFormat)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 transition-colors border border-white/10"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Export</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const { space, page } = getConfluenceSpaceAndPageFromUrl();
+                              if (!space || !page) {
+                                alert('Confluence space or page not specified in macro src URL.');
+                                return;
+                              }
+                              try {
+                                await apiService.saveToConfluence({
+                                  space_key: space,
+                                  page_title: page,
+                                  content: video.summary || '',
+                                });
+                                setShowToast(true);
+                                setTimeout(() => setShowToast(false), 3000);
+                              } catch (err: any) {
+                                alert('Failed to save to Confluence: ' + (err.message || err));
+                              }
+                            }}
+                            className="flex items-center space-x-2 px-4 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded-lg hover:bg-confluence-blue transition-colors border border-white/10"
+                          >
+                            <Save className="w-4 h-4" />
+                            <span>Save to Confluence</span>
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={exportAllVideos}
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 transition-colors border border-white/10"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Export All ({videos.length})</span>
-                      </button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            ))}
+          </div>
 
-              {videos.length === 0 && !isProcessing && (
-                <div className="text-center py-12">
-                  <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">No Videos Processed</h3>
-                  <p className="text-gray-500">Select a space and pages with video content to start generating AI summaries.</p>
+          {/* Bulk Export Section - Show when 2 or more videos */}
+          {videos.length >= 2 && (
+            <div className="mt-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">Export All Videos</h3>
+                  <p className="text-sm text-gray-600">Export all {videos.length} processed videos in a single file</p>
                 </div>
-              )}
-            </>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Format:</label>
+                    <select
+                      value={exportFormat}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                      className="px-3 py-1 border border-white/30 rounded text-sm focus:ring-2 focus:ring-confluence-blue bg-white/70 backdrop-blur-sm"
+                    >
+                      <option value="markdown">Markdown</option>
+                      <option value="pdf">PDF</option>
+                      <option value="docx">Word Document</option>
+                      <option value="txt">Plain Text</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={exportAllVideos}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 transition-colors border border-white/10"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export All ({videos.length})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Meeting Notes Extractor Tab */}
-          {activeTab === 'meeting' && (
-            <>
-              {/* Space Selection for Meeting Notes */}
-              <div className="mb-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4">Meeting Notes Extractor</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Confluence Space
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={selectedSpace}
-                        onChange={(e) => setSelectedSpace(e.target.value)}
-                        className="w-full p-3 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue appearance-none bg-white/70 backdrop-blur-sm"
-                      >
-                        <option value="">Choose a space...</option>
-                        {spaces.map(space => (
-                          <option key={space.key} value={space.key}>{space.name} ({space.key})</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Meeting Notes Input */}
-              <div className="mb-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                <h3 className="font-semibold text-gray-800 mb-4">Paste Meeting Notes</h3>
-                <textarea
-                  value={meetingNotes}
-                  onChange={(e) => setMeetingNotes(e.target.value)}
-                  placeholder="Paste your meeting notes here to extract action items..."
-                  className="w-full h-32 p-4 border border-white/30 rounded-lg focus:ring-2 focus:ring-confluence-blue focus:border-confluence-blue bg-white/70 backdrop-blur-sm resize-none"
-                />
-                <div className="flex justify-between items-center mt-4">
-                  <button
-                    onClick={clearMeetingNotes}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={extractTasks}
-                    disabled={!meetingNotes.trim() || !selectedSpace || isExtracting}
-                    className="px-6 py-2 bg-confluence-blue/90 backdrop-blur-sm text-white rounded-lg hover:bg-confluence-blue disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border border-white/10 flex items-center space-x-2"
-                  >
-                    {isExtracting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Extracting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-4 h-4" />
-                        <span>Extract Tasks</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Extracted Tasks */}
-              {extractedTasks.length > 0 && (
-                <div className="mb-6 bg-white/60 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-lg">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold text-gray-800">Extracted Action Items</h3>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={pushToSystems}
-                        disabled={isPushing}
-                        className="px-4 py-2 bg-green-600/90 backdrop-blur-sm text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors border border-white/10 flex items-center space-x-2"
-                      >
-                        {isPushing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Pushing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLink className="w-4 h-4" />
-                            <span>Push to Jira + Confluence + Slack</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {extractedTasks.map((task, index) => (
-                      <div key={index} className="bg-white/70 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-4 mb-2">
-                              <div className="flex items-center space-x-2">
-                                <Users className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm font-medium text-gray-700">{task.assignee}</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Calendar className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm text-gray-600">{task.due}</span>
-                              </div>
-                            </div>
-                            <p className="text-gray-800 font-medium">{task.task}</p>
-                            {task.jira_key && (
-                              <div className="mt-2 flex items-center space-x-2">
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Jira: {task.jira_key}</span>
-                                {task.jira_link && (
-                                  <a
-                                    href={task.jira_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    <span>View</span>
-                                  </a>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Results Summary */}
-                  {extractionResults && (
-                    <div className="mt-6 p-4 bg-green-50/80 backdrop-blur-sm rounded-lg border border-green-200">
-                      <h4 className="font-semibold text-green-800 mb-2">Integration Results</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="text-center">
-                          <div className="font-bold text-green-800">{extractionResults.total_tasks}</div>
-                          <div className="text-green-600">Total Tasks</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-bold text-blue-800">{extractionResults.jira_issues_created}</div>
-                          <div className="text-blue-600">Jira Issues</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-bold text-purple-800">{extractionResults.slack_notifications_sent}</div>
-                          <div className="text-purple-600">Slack Notifications</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-bold text-orange-800">{extractionResults.confluence_updated ? 'Yes' : 'No'}</div>
-                          <div className="text-orange-600">Confluence Updated</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {extractedTasks.length === 0 && !isExtracting && (
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">No Tasks Extracted</h3>
-                  <p className="text-gray-500">Paste your meeting notes and click "Extract Tasks" to get started.</p>
-                </div>
-              )}
-            </>
+          {videos.length === 0 && !isProcessing && (
+            <div className="text-center py-12">
+              <Video className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Videos Processed</h3>
+              <p className="text-gray-500">Select a space and pages with video content to start generating AI summaries.</p>
+            </div>
           )}
         </div>
       </div>
