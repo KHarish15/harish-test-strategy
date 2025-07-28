@@ -16,7 +16,7 @@ export type AppMode = 'agent' | 'tool' | null;
 
 export async function generateFlowchart(spaceKey: string, pageTitle: string, apiKey?: string) {
   const response = await axios.post(
-    `${process.env.REACT_APP_API_URL || "https://backend-i2dk.onrender.com"}/flowchart-generator`,
+    `${process.env.REACT_APP_API_URL || "https://backend-az2r.onrender.com"}/flowchart-generator`,
     {
       space_key: spaceKey,
       page_title: pageTitle,

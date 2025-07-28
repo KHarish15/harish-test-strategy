@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 
 # Configuration
-BACKEND_URL = "https://backend-i2dk.onrender.com"
+BACKEND_URL = "https://backend-az2r.onrender.com"
 CIRCLECI_API_TOKEN = os.getenv('CIRCLECI_API_TOKEN', 'your-circleci-token')
 CIRCLECI_PROJECT_SLUG = os.getenv('CIRCLECI_PROJECT_SLUG', 'github/your-username/your-repo')
 
