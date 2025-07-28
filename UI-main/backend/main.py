@@ -1949,13 +1949,15 @@ Meeting Notes:
         for task in tasks:
             try:
                 # Create Jira issue using existing jira_utils
-                issue_key = create_jira_issue(
+                jira_response = create_jira_issue(
                     summary=task["task"],
                     description=f"Auto-created from meeting notes. Due: {task['due']}",
                     issue_type="Task"
                 )
                 
-                if issue_key:
+                if jira_response and 'key' in jira_response:
+                    # Extract just the issue key from the response
+                    issue_key = jira_response['key']
                     # Get Jira issue details
                     jira_base_url = os.getenv('JIRA_BASE_URL')
                     jira_link = f"{jira_base_url}/browse/{issue_key}"
