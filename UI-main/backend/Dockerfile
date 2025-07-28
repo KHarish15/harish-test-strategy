@@ -1,8 +1,11 @@
 # Use an official Python base image
 FROM python:3.13-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y graphviz && rm -rf /var/lib/apt/lists/*
+# Install system dependencies including FFmpeg
+RUN apt-get update && apt-get install -y \
+    graphviz \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app
