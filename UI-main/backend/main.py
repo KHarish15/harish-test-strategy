@@ -760,8 +760,8 @@ CIRCLECI_API_TOKEN = os.getenv('CIRCLECI_API_TOKEN', 'your-circleci-token')
 CIRCLECI_PROJECT_SLUG = os.getenv('CIRCLECI_PROJECT_SLUG', 'github/KHarish15/finalmain')
 CIRCLECI_API_BASE = "https://circleci.com/api/v2"
 
-def trigger_circleci_pipeline(branch="main", parameters=None):
-    """Trigger a new CircleCI pipeline with enhanced visibility"""
+def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None, test_content=None, code_filename=None, test_filename=None):
+    """Trigger a new CircleCI pipeline with file content"""
     try:
         # Check if CircleCI is properly configured
         if CIRCLECI_API_TOKEN == 'your-circleci-token' or not CIRCLECI_API_TOKEN:
@@ -792,12 +792,27 @@ def trigger_circleci_pipeline(branch="main", parameters=None):
             "Content-Type": "application/json"
         }
         
-        # Minimal CircleCI API payload - no custom parameters
+        # Prepare payload with file content if provided
         payload = {
             "branch": branch
         }
         
-        print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
+        # Add file content parameters if provided
+        if code_content and test_content:
+            import base64
+            payload["parameters"] = {
+                "code_content": base64.b64encode(code_content.encode()).decode(),
+                "test_content": base64.b64encode(test_content.encode()).decode(),
+                "code_filename": code_filename or "python_sample.py",
+                "test_filename": test_filename or "input_file.py"
+            }
+            print(f"🚀 Triggering CircleCI pipeline with file content")
+            print(f"📄 Code file: {code_filename or 'python_sample.py'}")
+            print(f"🧪 Test file: {test_filename or 'input_file.py'}")
+        else:
+            print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
+            print(f"⚠️ No file content provided - will use sample files")
+        
         print(f"📋 Payload: {payload}")
         print(f"🔗 CircleCI Dashboard URL: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}")
         
@@ -1042,10 +1057,34 @@ async def test_support(request: TestRequest, req: Request):
         
         print(f"Code content length: {len(code_content)}")  # Debug log
         
-        # 🚀 TRIGGER CIRCLECI PIPELINE
-        print("🚀 Triggering CircleCI pipeline for test strategy generation...")
+        # Get test input page if provided
+        test_content = None
+        test_filename = None
+        if request.test_input_page_title:
+            test_page = next((p for p in pages if p["title"] == request.test_input_page_title), None)
+            if test_page:
+                test_data = confluence.get_page_by_id(test_page["id"], expand="body.storage")
+                test_content = test_data["body"]["storage"]["value"]
+                test_filename = f"{request.test_input_page_title}.py"
+                print(f"Found test input page: {test_page['title']}")
+                print(f"Test content length: {len(test_content)}")
+            else:
+                print(f"⚠️ Test input page '{request.test_input_page_title}' not found")
         
-        circleci_result = trigger_circleci_pipeline("main")
+        # 🚀 TRIGGER CIRCLECI PIPELINE WITH FILE CONTENT
+        print("🚀 Triggering CircleCI pipeline with file content...")
+        
+        # Clean code content (remove HTML tags if present)
+        clean_code_content = clean_html(code_content)
+        clean_test_content = clean_html(test_content) if test_content else None
+        
+        circleci_result = trigger_circleci_pipeline(
+            branch="main",
+            code_content=clean_code_content,
+            test_content=clean_test_content,
+            code_filename=f"{request.code_page_title}.py",
+            test_filename=test_filename
+        )
         
         if not circleci_result['success']:
             print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
