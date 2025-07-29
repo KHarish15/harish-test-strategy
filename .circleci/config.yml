@@ -292,9 +292,8 @@ jobs:
           command: |
             echo "📊 GENERATING COMPREHENSIVE TEST REPORT..."
             echo "=================================================="
-            
-            # Create detailed test results
-            cat > test_results_report.json << 'EOF'
+            # Create detailed test results using heredoc to avoid expression length limits
+            cat > test_results_report.json \<< 'EOF'
             {
               "test_strategy": {
                 "unit_testing": {
@@ -329,9 +328,9 @@ jobs:
                 "failed": 3,
                 "success_rate": "70%",
                 "execution_time": "$(date -Iseconds)",
-              "pipeline_info": {
-                "branch": "$CIRCLE_BRANCH",
-                "commit": "$CIRCLE_SHA1",
+                "pipeline_info": {
+                  "branch": "$CIRCLE_BRANCH",
+                  "commit": "$CIRCLE_SHA1",
                   "build_number": "$CIRCLE_BUILD_NUM",
                   "triggered_by": "Test Support Tool"
                 }
@@ -361,21 +360,19 @@ jobs:
               }
             }
             EOF
-            
+            echo "Test report written to test_results_report.json"
             echo "📋 Test Results Summary:"
             echo "   - Total Tests: 10"
             echo "   - Tests Passed: 7"
             echo "   - Tests Failed: 3"
             echo "   - Success Rate: 70%"
             echo "   - Test Strategy: Multi-layered (Unit, Integration, E2E, Accessibility, Security)"
-            echo ""
             echo "🎯 TEST STRATEGY EXECUTED:"
             echo "   ✅ Unit Testing: HTML structure and CSS validation"
             echo "   ✅ Integration Testing: Form functionality and input validation"
             echo "   ✅ End-to-End Testing: User interaction and responsive design"
             echo "   ❌ Accessibility Testing: ARIA compliance and semantic HTML (2 failures)"
             echo "   ⚠️ Security Testing: Input validation and security measures (1 failure)"
-            echo ""
             echo "📄 CODE ANALYSIS RESULTS:"
             echo "   - Page Type: Login Form"
             echo "   - Form Elements: 2 input fields (email, password)"
@@ -384,12 +381,10 @@ jobs:
             echo "   - Styling: CSS-based responsive design"
             echo "   - Accessibility: Basic compliance (needs improvement)"
             echo "   - Security: Missing CSRF protection"
-            echo ""
             echo "❌ FAILURE ANALYSIS:"
             echo "   - Accessibility: Form lacks proper labels for screen readers"
             echo "   - Security: Missing CSRF token for form protection"
             echo "   - Recommendations: Add labels, CSRF token, and aria-labels"
-            echo ""
             echo "📊 Test Results: 7/10 PASSED (70% Success Rate)"
       - run:
           name: Show completion
