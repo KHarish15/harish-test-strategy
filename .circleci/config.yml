@@ -13,7 +13,7 @@ jobs:
       - run:
           name: Run tests
           command: |
-            python -m pytest test_basic.py -v --tb=short
+            python -m pytest -v --tb=short
       - run:
           name: Dynamic Test Summary
           command: |
