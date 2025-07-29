@@ -1036,36 +1036,34 @@ def extract_code_from_confluence_html(page_content: str) -> str:
 
 def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
     code = extract_code_from_confluence_html(page_content)
-    # Escape triple double quotes to avoid breaking the test file
-    code = code.replace('"""', '\"\"\"')
     tests = []
     if "<form" in code:
         tests.append(
-            f'@pytest.mark.integration\ndef test_contains_form():\n    """Integration Test: Checks if the page contains a <form> element"""\n    assert "<form" in """{code}"""\n'
+            f'@pytest.mark.integration\ndef test_contains_form():\n    """Integration Test: Checks if the page contains a <form> element"""\n    assert "<form" in {code!r}\n'
         )
     if "<input" in code:
         tests.append(
-            f'@pytest.mark.unit\ndef test_contains_input():\n    """Unit Test: Checks if the page contains an <input> element"""\n    assert "<input" in """{code}"""\n'
+            f'@pytest.mark.unit\ndef test_contains_input():\n    """Unit Test: Checks if the page contains an <input> element"""\n    assert "<input" in {code!r}\n'
         )
     if "<button" in code:
         tests.append(
-            f'@pytest.mark.integration\ndef test_contains_button():\n    """Integration Test: Checks if the page contains a <button> element"""\n    assert "<button" in """{code}"""\n'
+            f'@pytest.mark.integration\ndef test_contains_button():\n    """Integration Test: Checks if the page contains a <button> element"""\n    assert "<button" in {code!r}\n'
         )
     if "<title" in code:
         tests.append(
-            f'@pytest.mark.e2e\ndef test_contains_title():\n    """E2E Test: Checks if the page contains a <title> element"""\n    assert "<title" in """{code}"""\n'
+            f'@pytest.mark.e2e\ndef test_contains_title():\n    """E2E Test: Checks if the page contains a <title> element"""\n    assert "<title" in {code!r}\n'
         )
     if "lang=" in code:
         tests.append(
-            f'@pytest.mark.accessibility\ndef test_html_lang():\n    """Accessibility Test: Checks if the <html> tag has a lang attribute"""\n    assert "lang=" in """{code}"""\n'
+            f'@pytest.mark.accessibility\ndef test_html_lang():\n    """Accessibility Test: Checks if the <html> tag has a lang attribute"""\n    assert "lang=" in {code!r}\n'
         )
     if "type=\"password\"" in code:
         tests.append(
-            f'@pytest.mark.security\ndef test_password_input():\n    """Security Test: Checks if the page contains a password input field"""\n    assert "type=\"password\"" in """{code}"""\n'
+            f'@pytest.mark.security\ndef test_password_input():\n    """Security Test: Checks if the page contains a password input field"""\n    assert "type=\"password\"" in {code!r}\n'
         )
     if not tests:
         tests.append(
-            f'def test_code_not_empty():\n    """Unit Test: Checks that the code block is not empty"""\n    assert """{code}""" != ""\n'
+            f'def test_code_not_empty():\n    """Unit Test: Checks that the code block is not empty"""\n    assert {code!r} != ""\n'
         )
     test_code = "import pytest\n" + "\n".join(tests)
     with open(filename, "w", encoding="utf-8") as f:
