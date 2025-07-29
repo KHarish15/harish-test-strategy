@@ -9,23 +9,15 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pip install pytest
+            pip install pytest requests
       - run:
-          name: Run Dynamic Tests and Summarize
+          name: Run tests
           command: |
-            pytest test_main.py -v --tb=short | tee pytest_output.txt
-            echo "\n==================== DYNAMIC TEST SUMMARY ===================="
-            TOTAL=$(grep -c 'def test_' test_main.py)
-            PASSED=$(grep -c ' PASSED' pytest_output.txt)
-            FAILED=$(grep -c ' FAILED' pytest_output.txt)
-            echo "Number of test cases: $TOTAL"
-            echo "Number of test cases passed: $PASSED"
-            echo "Number of test cases failed: $FAILED"
-            if [ "$FAILED" -eq 0 ]; then
-              echo "Final Status: PASSED"
-            else
-              echo "Final Status: FAILED"
-            fi
+            python -m pytest test_basic.py -v --tb=short
+      - run:
+          name: Dynamic Test Summary
+          command: |
+            python run_dynamic_tests.py
 
 workflows:
   version: 2

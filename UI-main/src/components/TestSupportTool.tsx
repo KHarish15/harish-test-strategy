@@ -41,16 +41,6 @@ interface TestRecommendations {
   action_items: string[];
 }
 
-// Add this utility to parse test results from backend response (mockup for demonstration)
-function parseTestResultsFromLogs(logs: string) {
-  if (!logs || logs.includes('ERROR collecting')) {
-    return { passed: 0, failed: 0, logs, error: 'No valid tests found or test file is invalid.' };
-  }
-  const passed = (logs.match(/PASSED/g) || []).length;
-  const failed = (logs.match(/FAILED|ERROR/g) || []).length;
-  return { passed, failed, logs };
-}
-
 const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSelect, autoSpaceKey, isSpaceAutoConnected }) => {
   const [selectedSpace, setSelectedSpace] = useState('');
   const [codePage, setCodePage] = useState('');
@@ -76,7 +66,6 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
   const [circleciStatus, setCircleciStatus] = useState<string>('idle');
   const [circleciLogs, setCircleciLogs] = useState<string[]>([]);
   const [isPollingStatus, setIsPollingStatus] = useState(false);
-  const [testResults, setTestResults] = useState<{passed: number, failed: number, logs: string, error?: string} | null>(null);
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -412,25 +401,6 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
     } catch (err) {
       setError('Failed to trigger pipeline. Please try again.');
       console.error('Error triggering pipeline:', err);
-    }
-  };
-
-  const pollCircleCIStatus = async (pipelineId: string) => {
-    try {
-      const res = await apiService.getCircleCIStatus(pipelineId);
-      // Assume res contains status and logs
-      if (res.status === 'failed' || res.status === 'success') {
-        const parsed = parseTestResultsFromLogs(res.logs || '');
-        setTestResults(parsed);
-        setCircleciStatus(res.status === 'failed' ? 'failed' : 'finished');
-        setCircleciLogs((res.logs || '').split('\n'));
-      } else {
-        setCircleciStatus('running');
-      }
-    } catch (err) {
-      setCircleciStatus('failed');
-      setTestResults({ passed: 0, failed: 0, logs: '', error: 'Could not fetch test results. Please check CircleCI or your test file.' });
-      setError('Could not fetch test results. Please check CircleCI or your test file.');
     }
   };
 

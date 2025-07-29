@@ -25,8 +25,6 @@ from datetime import datetime
 from flowchart_generator import generate_flowchart_image
 from jira_utils import create_jira_issue
 from slack_utils import send_slack_message
-import subprocess
-import html
 
 # Load environment variables
 load_dotenv()
@@ -1019,90 +1017,6 @@ from fastapi import APIRouter, Request
 
 # Removed duplicate router endpoint to fix conflicts
 
-def extract_code_from_confluence_html(page_content: str) -> str:
-    soup = BeautifulSoup(page_content, "html.parser")
-    # Try to find Confluence code macro blocks
-    code_blocks = soup.find_all('ac:plain-text-body')
-    if code_blocks:
-        code = ''.join(cb.get_text() for cb in code_blocks)
-    else:
-        # Fallback: try <pre> or <code>
-        pre = soup.find('pre')
-        code = pre.get_text() if pre else soup.get_text()
-    # Unescape HTML and clean up
-    code = html.unescape(code)
-    code = code.replace('<br />', '\n').replace('<br/>', '\n')
-    return code
-def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
-    code = extract_code_from_confluence_html(page_content)
-    escaped_code = repr(code)  # ensures safe Python string with escaped HTML/code
-    tests = []
-
-    if "<form" in code:
-        tests.append(
-            f'@pytest.mark.integration\ndef test_contains_form():\n    """Integration Test: Checks if the page contains a <form> element"""\n    assert "<form" in {escaped_code}\n'
-        )
-    if "<input" in code:
-        tests.append(
-            f'@pytest.mark.unit\ndef test_contains_input():\n    """Unit Test: Checks if the page contains an <input> element"""\n    assert "<input" in {escaped_code}\n'
-        )
-    if "<button" in code:
-        tests.append(
-            f'@pytest.mark.integration\ndef test_contains_button():\n    """Integration Test: Checks if the page contains a <button> element"""\n    assert "<button" in {escaped_code}\n'
-        )
-    if "<title" in code:
-        tests.append(
-            f'@pytest.mark.e2e\ndef test_contains_title():\n    """E2E Test: Checks if the page contains a <title> element"""\n    assert "<title" in {escaped_code}\n'
-        )
-    if "lang=" in code:
-        tests.append(
-            f'@pytest.mark.accessibility\ndef test_html_lang():\n    """Accessibility Test: Checks if the <html> tag has a lang attribute"""\n    assert "lang=" in {escaped_code}\n'
-        )
-    if 'type="password"' in code:
-        tests.append(
-            f'@pytest.mark.security\ndef test_password_input():\n    """Security Test: Checks if the page contains a password input field"""\n    assert "type=\"password\"" in {escaped_code}\n'
-        )
-    if not tests:
-        tests.append(
-            f'def test_code_not_empty():\n    """Unit Test: Checks that the code block is not empty"""\n    assert {escaped_code} != ""\n'
-        )
-
-    test_code = "import pytest\n\n" + "\n".join(tests)
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(test_code)
-
-    return filename
-
-def update_github_file(filename: str, repo: str, branch: str = "main"):
-    token = os.getenv("GITHUB_TOKEN")
-    if not token:
-        raise Exception("GITHUB_TOKEN not set in environment variables")
-    with open(filename, "r", encoding="utf-8") as f:
-        content = f.read()
-    url = f"https://api.github.com/repos/{repo}/contents/{filename}"
-    headers = {"Authorization": f"token {token}"}
-    # Get SHA if file exists
-    r = requests.get(url, headers=headers, params={"ref": branch})
-    sha = r.json().get("sha") if r.status_code == 200 else None
-    data = {
-        "message": f"Update {filename} via AI Test Support",
-        "content": base64.b64encode(content.encode()).decode(),
-        "branch": branch,
-    }
-    if sha:
-        data["sha"] = sha
-    r = requests.put(url, headers=headers, json=data)
-    r.raise_for_status()
-    return r.json()
-
-def save_code_and_tests_from_confluence(code_content: str, test_content: str):
-    # Save code page as main.py
-    with open("main.py", "w", encoding="utf-8") as f:
-        f.write(code_content)
-    # Save test input page as test_main.py
-    with open("test_main.py", "w", encoding="utf-8") as f:
-        f.write(test_content)
-
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
     """Test Support Tool functionality with CircleCI integration"""
@@ -1113,32 +1027,30 @@ async def test_support(request: TestRequest, req: Request):
         print(f"Test support request: {request}")  # Debug log
         confluence = init_confluence()
         space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
+        
         # Get code page
         pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
         code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
-        test_input_page = next((p for p in pages if p["title"] == getattr(request, 'test_input_page_title', None)), None)
+        
         if not code_page:
             raise HTTPException(status_code=400, detail="Code page not found")
+        
         print(f"Found code page: {code_page['title']}")  # Debug log
+        
         code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
         code_content = code_data["body"]["storage"]["value"]
+        
         print(f"Code content length: {len(code_content)}")  # Debug log
-        # If test input page is provided, fetch and save both code and test files
-        if test_input_page:
-            test_data = confluence.get_page_by_id(test_input_page["id"], expand="body.storage")
-            test_content = test_data["body"]["storage"]["value"]
-            save_code_and_tests_from_confluence(code_content, test_content)
-            print("✅ Saved main.py and test_main.py for dynamic testing.")
-        else:
-            # Fallback: generate a test file from code content (legacy flow)
-            test_filename = generate_test_file_from_confluence(code_content)
-            update_github_file(test_filename, "KHarish15/harish-test-strategy", "main")
-            print(f"✅ Dynamic test file {test_filename} updated in GitHub repo.")
+        
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
+        
         circleci_result = trigger_circleci_pipeline("main")
+        
         if not circleci_result['success']:
             print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
+            # Continue with AI generation even if CircleCI fails
+        
         # Generate test strategy
         prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
 
