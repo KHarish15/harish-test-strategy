@@ -1036,16 +1036,57 @@ def extract_code_from_confluence_html(page_content: str) -> str:
 
 def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
     code = extract_code_from_confluence_html(page_content)
-    test_code = f'''
-import pytest
-
+    tests = []
+    # Dynamic test generation with descriptive names and docstrings
+    if "<form" in code:
+        tests.append(f'''
+@pytest.mark.integration
+def test_contains_form():
+    """Integration Test: Checks if the page contains a <form> element"""
+    assert "<form" in {code!r}
+''')
+    if "<input" in code:
+        tests.append(f'''
 @pytest.mark.unit
+def test_contains_input():
+    """Unit Test: Checks if the page contains an <input> element"""
+    assert "<input" in {code!r}
+''')
+    if "<button" in code:
+        tests.append(f'''
+@pytest.mark.integration
+def test_contains_button():
+    """Integration Test: Checks if the page contains a <button> element"""
+    assert "<button" in {code!r}
+''')
+    if "<title" in code:
+        tests.append(f'''
+@pytest.mark.e2e
+def test_contains_title():
+    """E2E Test: Checks if the page contains a <title> element"""
+    assert "<title" in {code!r}
+''')
+    if "lang=" in code:
+        tests.append(f'''
+@pytest.mark.accessibility
+def test_html_lang():
+    """Accessibility Test: Checks if the <html> tag has a lang attribute"""
+    assert "lang=" in {code!r}
+''')
+    if "type=\"password\"" in code:
+        tests.append(f'''
+@pytest.mark.security
+def test_password_input():
+    """Security Test: Checks if the page contains a password input field"""
+    assert "type=\"password\"" in {code!r}
+''')
+    if not tests:
+        tests.append(f'''
 def test_code_not_empty():
-    """Unit Test: Code block is not empty"""
-    assert {repr(code.strip())} != ""
-
-# Add more tests here as needed, using the cleaned code variable
-'''
+    """Unit Test: Checks that the code block is not empty"""
+    assert {code!r} != ""
+''')
+    test_code = "import pytest\n" + "\n".join(tests)
     with open(filename, "w", encoding="utf-8") as f:
         f.write(test_code)
     return filename
