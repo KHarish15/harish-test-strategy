@@ -800,15 +800,37 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
         # Add file content parameters if provided
         if code_content and test_content:
             import base64
-            payload["parameters"] = {
-                "code_content": base64.b64encode(code_content.encode()).decode(),
-                "test_content": base64.b64encode(test_content.encode()).decode(),
-                "code_filename": code_filename or "python_sample.py",
-                "test_filename": test_filename or "input_file.py"
-            }
-            print(f"🚀 Triggering CircleCI pipeline with file content")
-            print(f"📄 Code file: {code_filename or 'python_sample.py'}")
-            print(f"🧪 Test file: {test_filename or 'input_file.py'}")
+            
+            # Check content size limits for CircleCI parameters (512 chars max)
+            code_b64 = base64.b64encode(code_content.encode()).decode()
+            test_b64 = base64.b64encode(test_content.encode()).decode()
+            
+            # Check if content is too large for CircleCI parameters
+            if len(code_b64) > 400 or len(test_b64) > 400:  # Leave some buffer
+                print(f"⚠️ File content too large for CircleCI parameters")
+                print(f"📄 Code content size: {len(code_b64)} chars")
+                print(f"🧪 Test content size: {len(test_b64)} chars")
+                print(f"📋 CircleCI limit: 512 chars per parameter")
+                print(f"🔄 Using minimal parameters - CircleCI will create sample files")
+                print(f"💡 For large files, consider using smaller test files or splitting content")
+                
+                # For large files, we'll let CircleCI use its fallback mechanism
+                # This ensures the pipeline still runs and shows test structure
+                payload["parameters"] = {
+                    "code_filename": code_filename or "python_sample.py",
+                    "test_filename": test_filename or "input_file.py"
+                }
+            else:
+                # Content is small enough - use normal approach
+                payload["parameters"] = {
+                    "code_content": code_b64,
+                    "test_content": test_b64,
+                    "code_filename": code_filename or "python_sample.py",
+                    "test_filename": test_filename or "input_file.py"
+                }
+                print(f"🚀 Triggering CircleCI pipeline with file content")
+                print(f"📄 Code file: {code_filename or 'python_sample.py'}")
+                print(f"🧪 Test file: {test_filename or 'input_file.py'}")
         else:
             print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
             print(f"⚠️ No file content provided - will use sample files")
@@ -900,6 +922,8 @@ This page will be updated as the pipeline progresses. Refresh to see latest stat
                 error_msg = "CircleCI project not found. Please check your CIRCLECI_PROJECT_SLUG environment variable."
             elif response.status_code == 403:
                 error_msg = "CircleCI API token doesn't have permission to trigger pipelines."
+            elif response.status_code == 400:
+                error_msg = "Invalid request parameters. File content may be too large for CircleCI parameters."
             
             return {
                 "success": False,
