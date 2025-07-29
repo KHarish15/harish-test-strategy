@@ -1209,569 +1209,42 @@ Provide specific examples and code snippets for each category."""
 
 @app.post("/analyze-logs")
 async def analyze_logs(request: Request):
-    """Enhanced endpoint for CircleCI to send test logs for AI analysis"""
+    """Analyze test logs with AI and provide insights"""
     try:
-        data = await request.json()
-        test_results = data.get('test_results', {})
+        api_key = get_actual_api_key_from_identifier(request.headers.get('x-api-key'))
+        genai.configure(api_key=api_key)
+        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
         
-        # Extract pipeline information
-        pipeline_info = test_results.get('pipeline_info', {})
-        branch = pipeline_info.get('branch', 'unknown')
-        commit = pipeline_info.get('commit', 'unknown')
-        build_number = pipeline_info.get('build_number', 'unknown')
+        # Get test results from request
+        body = await request.json()
+        test_results = body.get('test_results', {})
         
-        # Create comprehensive prompt for AI analysis
+        # Create AI prompt for log analysis
         prompt = f"""
-        You are an expert software testing analyst. Analyze the following test results from a CI/CD pipeline and provide detailed insights.
-
-        **Build Information:**
-        - Branch: {branch}
-        - Commit: {commit[:8] if commit != 'unknown' else 'unknown'}
-        - Build Number: {build_number}
-        - Timestamp: {test_results.get('timestamp', 'unknown')}
-
-        **Test Results:**
-        - Status: {test_results.get('status', 'unknown')}
-        - Passed: {test_results.get('passed', 0)}
-        - Failed: {test_results.get('failed', 0)}
-        - Coverage: {test_results.get('coverage', 'N/A')}
+        Analyze the following test results and provide insights:
         
-        **Test Logs:**
-        {test_results.get('logs', 'No logs provided')}
+        Test Results: {test_results}
         
-        **Error Logs:**
-        {test_results.get('errors', 'No errors')}
-
-        Please provide a comprehensive analysis in the following format:
-
-        ## 📊 Test Summary
-        [Provide a clear summary of test results and overall status]
-
-        ## 🔍 Detailed Analysis
-        [Analyze specific test failures, patterns, and root causes]
-
-        ## 🛠️ Recommended Actions
-        [List specific actions to fix issues and improve testing]
-
-        ## 📈 Coverage Insights
-        [Analyze test coverage and suggest improvements]
-
-        ## 🚀 Performance Recommendations
-        [Suggest optimizations for test execution and CI/CD pipeline]
-
-        ## 🔮 Predictive Insights
-        [Based on patterns, predict potential future issues]
-
-        Be specific, actionable, and provide code examples where relevant.
+        Please provide:
+        1. Summary of test execution
+        2. Root cause analysis for any failures
+        3. Recommendations for fixing issues
+        4. Suggestions for improving test coverage
+        5. Next steps for the development team
+        
+        Format your response in a clear, structured manner.
         """
         
-        # Call Gemini AI for analysis
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
-        analysis = response.text
+        response = ai_model.generate_content(prompt)
+        analysis = response.text.strip()
         
-        # Generate additional metrics
-        total_tests = test_results.get('passed', 0) + test_results.get('failed', 0)
-        success_rate = (test_results.get('passed', 0) / total_tests * 100) if total_tests > 0 else 0
-        
-        # Create structured response
         return {
-            "status": "success",
             "analysis": analysis,
-            "metrics": {
-                "total_tests": total_tests,
-                "success_rate": round(success_rate, 2),
-                "build_info": {
-                    "branch": branch,
-                    "commit": commit[:8] if commit != 'unknown' else 'unknown',
-                    "build_number": build_number
-                }
-            },
-            "test_results": test_results,
-            "recommendations": {
-                "priority": "high" if test_results.get('failed', 0) > 0 else "low",
-                "action_items": [
-                    "Review failed tests immediately" if test_results.get('failed', 0) > 0 else "All tests passed - good job!",
-                    "Check test coverage reports",
-                    "Monitor for flaky tests"
-                ]
-            }
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "analysis": "AI analysis failed due to an error",
-            "recommendations": {
-                "priority": "critical",
-                "action_items": ["Check AI service connectivity", "Review error logs"]
-            }
-        }
-
-@app.post("/save-to-confluence")
-async def save_to_confluence(request: SaveToConfluenceRequest, req: Request):
-    """Test Support Tool functionality"""
-    try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
-        print(f"Test support request: {request}")  # Debug log
-        confluence = init_confluence()
-        space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
-        
-        # Get code page
-        pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
-        code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
-        
-        if not code_page:
-            raise HTTPException(status_code=400, detail="Code page not found")
-        
-        print(f"Found code page: {code_page['title']}")  # Debug log
-        
-        code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
-        code_content = code_data["body"]["storage"]["value"]
-        
-        print(f"Code content length: {len(code_content)}")  # Debug log
-        
-        # Generate test strategy
-        prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
-
-Make sure each section heading is **clearly labeled** and includes a **percentage estimate** of total testing effort and the total of all percentage values across Unit Test, Integration Test, and End-to-End (E2E) Test must add up to exactly **100%**. Each subpoint should be short (1–2 lines max). Use bullet points for clarity.
-
----
-
-
-## Unit Test (xx%)
-- **Coverage Areas**:  
-  - What functions or UI elements are directly tested?  
-- **Edge Cases**:  
-  - List 2–3 specific edge conditions or unusual inputs.
-
-## Integration Test (xx%)
-- **Integrated Modules**:  
-  - What parts of the system work together and need testing as a unit?  
-- **Data Flow Validation**:  
-  - How does data move between components or layers?
-
-## End-to-End (E2E) Test (xx%)
-- **User Scenarios**:  
-  - Provide 2–3 user flows that simulate real usage.  
-- **System Dependencies**:  
-  - What systems, APIs, or services must be operational?
-
-## Test Data Management
-- **Data Requirements**:  
-  - What test data (e.g., users, tokens, inputs) is needed?  
-- **Data Setup & Teardown**:  
-  - How is test data created and removed?
-
-## Automation Strategy
-- **Frameworks/Tools**:  c v
-  - Recommend tools for each test level.  
-- **CI/CD Integration**:  
-  - How will tests be included in automated pipelines?
-
-## Risk Areas Identified
-- **Complex Logic**:  
-  - Highlight any logic that's error-prone or tricky.  
-- **Third-Party Dependencies**:  
-  - Any reliance on external APIs or libraries?  
-- **Security/Critical Flows**:  
-  - Mention any data protection or authentication flows.
-
-## Additional Considerations
-- **Security**:  
-  - Are there vulnerabilities or security-sensitive operations?  
-- **Accessibility**:  
-  - Are there any compliance or usability needs?  
-- **Performance**:  
-  - Should speed, responsiveness, or load handling be tested?
-
----
-
-Please format your response exactly like this structure, using proper markdown headings, short bullet points, and estimated test effort percentages. """
-
-        response_strategy = ai_model.generate_content(prompt_strategy)
-        strategy_text = response_strategy.text.strip()
-        
-        print(f"Strategy generated: {len(strategy_text)} chars")  # Debug log
-        
-        # Generate cross-platform testing
-        prompt_cross_platform = f"""You are a cross-platform UI testing expert. Analyze the following frontend code and generate a detailed cross-platform test strategy using the structure below. Your insights should be **relevant to the code**, not generic. Code:\n\n{code_content[:2000]}\n\nFollow the format strictly and customize values based on the code analysis. Avoid repeating default phrases — provide actual testing considerations derived from the code.
-
----
-
-
-## Platform Coverage Assessment
-
-### Web Browsers
-- **Chrome**: [Insert expected behavior or issues specific to the code]  
-- **Firefox**: [Insert any rendering quirks, compatibility notes, or enhancements]  
-- **Safari**: [Highlight any issues with WebKit or mobile Safari]  
-- **Edge**: [Mention compatibility or layout differences]  
-- **Mobile Browsers**: [Describe responsive behavior, touch issues, or layout breaks]  
-
-### Operating Systems
-- **Windows**: [Describe any dependency or rendering issues noticed]  
-- **macOS**: [Note differences in rendering, fonts, or interactions]  
-- **Linux**: [Mention support in containerized or open environments]  
-- **Mobile iOS**: [Identify areas needing testing on Safari iOS or WebView]  
-- **Android**: [Highlight performance, scrolling, or viewport concerns]  
-
-### Device Categories
-- **Desktop**: [List full UI/feature behavior on large screens]  
-- **Tablet**: [Mention any layout shifting, input mode support, or constraints]  
-- **Mobile**: [List responsiveness issues or changes in UI behavior]  
-- **Accessibility**: [Accessibility tags, ARIA usage, screen reader compatibility]  
-
-## Testing Approach
-
-### Automated Cross-Platform Testing
-- **Browser Stack Integration**: [Which browsers/devices to target and why]  
-- **Device Farm Testing**: [Recommend real-device scenarios to validate]  
-- **Performance Benchmarking**: [How platform differences might affect performance]  
-
-### Manual Testing Strategy
-- **User Acceptance Testing**: [Suggest user workflows to validate on each platform]  
-- **Accessibility Testing**: [Mention checks like tab order, ARIA roles, color contrast]  
-- **Localization Testing**: [If text/UI is dynamic, how to test translations or RTL]  
-
-## Platform-Specific Considerations
-
-### Performance Optimization
-- **Mobile**: [Mention any heavy assets, unused JS/CSS, or optimizations needed]  
-- **Desktop**: [Advanced UI behaviors or feature flags that only show on desktop]  
-- **Tablets**: [Navigation patterns or split-view compatibility]  
-
-### Security Implications
-- **iOS**: [Any app/webview permissions or secure storage issues]  
-- **Android**: [Issues with file access, permissions, or deep linking]  
-- **Web**: [CSP, HTTPS enforcement, token handling or XSS risks]  
-
----
-
-Respond **exactly** in this format with dynamic insights, no extra text outside the structure. """
-
-
-        response_cross_platform = ai_model.generate_content(prompt_cross_platform)
-        cross_text = response_cross_platform.text.strip()
-        
-        print(f"Cross-platform generated: {len(cross_text)} chars")  # Debug log
-        
-        # Sensitivity analysis if test input page provided
-        sensitivity_text = None
-        if request.test_input_page_title:
-            test_input_page = next((p for p in pages if p["title"] == request.test_input_page_title), None)
-            if test_input_page:
-                test_data = confluence.get_page_by_id(test_input_page["id"], expand="body.storage")
-                test_input_content = test_data["body"]["storage"]["value"]
-                
-                prompt_sensitivity = f"""You are a data privacy expert. Classify sensitive fields (PII, credentials, financial) and provide masking suggestions.Also, don't include comments if any code is present.\n\nData:\n{test_input_content[:2000]}"""
-
-
-
-                response_sensitivity = ai_model.generate_content(prompt_sensitivity)
-                sensitivity_text = response_sensitivity.text.strip()
-                print(f"Sensitivity generated: {len(sensitivity_text)} chars")  # Debug log
-        
-        # Q&A if question provided
-        ai_response = None
-        if request.question:
-            context = f"📘 Test Strategy:\n{strategy_text}\n🌐 Cross-Platform Testing:\n{cross_text}"
-            if sensitivity_text:
-                context += f"\n🔒 Sensitivity Analysis:\n{sensitivity_text}"
-            
-            prompt_chat = f"""Based on the following content:\n{context}\n\nAnswer this user query: "{request.question}" """
-            response_chat = ai_model.generate_content(prompt_chat)
-            ai_response = response_chat.text.strip()
-            print(f"Q&A generated: {len(ai_response)} chars")  # Debug log
-        
-        result = {
-            "test_strategy": strategy_text,
-            "cross_platform_testing": cross_text,
-            "sensitivity_analysis": sensitivity_text,
-            "ai_response": ai_response
-        }
-        
-        print(f"Returning result: {result}")  # Debug log
-        return result
-        
-    except Exception as e:
-        print(f"Test support error: {str(e)}")  # Debug log
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/images/{space_key}/{page_title}")
-async def get_images(space_key: Optional[str] = None, page_title: str = ""):
-    """Get all images from a specific page"""
-    try:
-        confluence = init_confluence()
-        space_key = auto_detect_space(confluence, space_key)
-        
-        # Get page content
-        pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=100)
-        page = next((p for p in pages if p["title"].strip().lower() == page_title.strip().lower()), None)
-        
-        if not page:
-            raise HTTPException(status_code=404, detail=f"Page '{page_title}' not found")
-        
-        page_id = page["id"]
-        html_content = confluence.get_page_by_id(page_id=page_id, expand="body.export_view")["body"]["export_view"]["value"]
-        soup = BeautifulSoup(html_content, "html.parser")
-        base_url = os.getenv("CONFLUENCE_BASE_URL")
-        
-        image_urls = list({
-            base_url + img["src"] if img["src"].startswith("/") else img["src"]
-            for img in soup.find_all("img") if img.get("src")
-        })
-        
-        return {"images": image_urls}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/image-summary")
-async def image_summary(request: ImageRequest, req: Request):
-    """Generate AI summary for an image"""
-    try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
-        confluence = init_confluence()
-        space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
-        
-        # Download image
-        auth = (os.getenv('CONFLUENCE_USER_EMAIL'), os.getenv('CONFLUENCE_API_KEY'))
-        response = requests.get(request.image_url, auth=auth)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail="Failed to fetch image")
-        
-        image_bytes = response.content
-        
-        # Upload to Gemini
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-            tmp.write(image_bytes)
-            tmp.flush()
-            uploaded = genai.upload_file(
-                path=tmp.name,
-                mime_type="image/png",
-                display_name=f"confluence_image_{request.page_title}.png"
-            )
-        
-        prompt = (
-            "You are analyzing a technical image from a documentation page. "
-            "If it's a chart or graph, explain what is shown in detail. "
-            "If it's code, summarize what the code does. "
-            "Avoid mentioning filenames or metadata. Provide an informative analysis in 1 paragraph."
-        )
-        
-        response = ai_model.generate_content([uploaded, prompt])
-        summary = response.text.strip()
-        
-        return {"summary": summary}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/image-qa")
-async def image_qa(request: ImageSummaryRequest, req: Request):
-    """Generate AI response for a question about an image"""
-    try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
-        confluence = init_confluence()
-        space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
-        
-        # Download image
-        auth = (os.getenv('CONFLUENCE_USER_EMAIL'), os.getenv('CONFLUENCE_API_KEY'))
-        response = requests.get(request.image_url, auth=auth)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail="Failed to fetch image")
-        
-        image_bytes = response.content
-        
-        # Upload to Gemini
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
-            tmp_img.write(image_bytes)
-            tmp_img.flush()
-            uploaded_img = genai.upload_file(
-                path=tmp_img.name,
-                mime_type="image/png",
-                display_name=f"qa_image_{request.page_title}.png"
-            )
-        
-        full_prompt = (
-            "You're analyzing a technical image extracted from documentation. "
-            "Answer the user's question based on the visual content of the image, "
-            "as well as the summary below.\n\n"
-            f"Summary:\n{request.summary}\n\n"
-            f"User Question:\n{request.question}"
-        )
-        
-        ai_response = ai_model.generate_content([uploaded_img, full_prompt])
-        answer = ai_response.text.strip()
-        
-        return {"answer": answer}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/create-chart")
-async def create_chart(request: ChartRequest, req: Request):
-    """Create chart from image data"""
-    try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
-        confluence = init_confluence()
-        space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
-        
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        from io import StringIO
-        
-        # Download image
-        auth = (os.getenv('CONFLUENCE_USER_EMAIL'), os.getenv('CONFLUENCE_API_KEY'))
-        response = requests.get(request.image_url, auth=auth)
-        if response.status_code != 200:
-            raise HTTPException(status_code=404, detail="Failed to fetch image")
-        
-        image_bytes = response.content
-        
-        # Upload to Gemini for data extraction
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
-            tmp_img.write(image_bytes)
-            tmp_img.flush()
-            uploaded_img = genai.upload_file(
-                path=tmp_img.name,
-                mime_type="image/png",
-                display_name=f"chart_image_{request.page_title}.png"
-            )
-        
-        graph_prompt = (
-            "You're looking at a Likert-style bar chart image or table. Extract the full numeric table represented by the chart.\n"
-            "Return only the raw CSV table: no markdown, no comments, no code blocks.\n"
-            "The first column must be the response category (e.g., Strongly Agree), followed by columns for group counts (e.g., Students, Lecturers, Staff, Total).\n"
-            "Ensure all values are numeric and the CSV is properly aligned. Do NOT summarize—just output the table."
-        )
-        
-        graph_response = ai_model.generate_content([uploaded_img, graph_prompt])
-        csv_text = graph_response.text.strip()
-        
-        # Clean CSV data
-        def clean_ai_csv(raw_text):
-            lines = raw_text.strip().splitlines()
-            clean_lines = [
-                line.strip() for line in lines
-                if ',' in line and not line.strip().startswith("```") and not line.lower().startswith("here")
-            ]
-            header = clean_lines[0].split(",")
-            cleaned_data = [clean_lines[0]]
-            for line in clean_lines[1:]:
-                if line.split(",")[0] != header[0]:
-                    cleaned_data.append(line)
-            return "\n".join(cleaned_data)
-        
-        cleaned_csv = clean_ai_csv(csv_text)
-        df = pd.read_csv(StringIO(cleaned_csv))
-        
-        for col in df.columns[1:]:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        df.dropna(subset=df.columns[1:], how='all', inplace=True)
-        
-        if df.empty:
-            raise HTTPException(status_code=400, detail="Failed to extract chart data from image")
-        
-        # Create chart based on type
-        if request.chart_type == "Grouped Bar":         
-            melted = df.melt(id_vars=[df.columns[0]], var_name="Group", value_name="Count")
-            plt.figure(figsize=(10, 6))
-            sns.barplot(data=melted, x=melted.columns[0], y="Count", hue="Group")
-            plt.xticks(rotation=45)
-            plt.title("Grouped Bar Chart")
-            plt.tight_layout()
-        elif request.chart_type == "Stacked Bar":
-            df_plot = df.set_index(df.columns[0])
-            plt.figure(figsize=(10, 6))
-            df_plot.drop(columns="Total", errors="ignore").plot(kind='bar', stacked=True)
-            plt.title("Stacked Bar Chart")
-            plt.xticks(rotation=45)
-            plt.ylabel("Count")
-            plt.tight_layout()
-        elif request.chart_type == "Line":
-            df_plot = df.set_index(df.columns[0])
-            plt.figure(figsize=(10, 6))
-            df_plot.drop(columns="Total", errors="ignore").plot(marker='o')
-            plt.title("Line Chart")
-            plt.xticks(rotation=45)
-            plt.ylabel("Count")
-            plt.tight_layout()
-        elif request.chart_type == "Pie":
-            plt.figure(figsize=(7, 6))
-            label_col = df.columns[0]
-            if "Total" in df.columns:
-                data = df["Total"]
-            else:
-                data = df.iloc[:, 1:].sum(axis=1)
-            plt.pie(data, labels=df[label_col], autopct="%1.1f%%", startangle=140)
-            plt.title("Pie Chart (Total Responses)")
-            plt.tight_layout()
-        
-        # Save chart to bytes
-        buf = io.BytesIO()
-        plt.savefig(buf, format=request.format.lower(), bbox_inches="tight")
-        buf.seek(0)
-        chart_bytes = buf.getvalue()
-        
-        # Convert to base64 for response
-        chart_base64 = base64.b64encode(chart_bytes).decode()
-        
-        return {
-            "chart_data": chart_base64,
-            "mime_type": f"image/{request.format.lower()}",
-            "filename": f"{request.filename}.{request.format.lower()}"
+            "test_results": test_results
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/export")
-async def export_content(request: ExportRequest, req: Request):
-    """Export content in various formats"""
-    try:
-        api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
-        if request.format == "pdf":
-            buffer = create_pdf(request.content)
-            file_data = buffer.getvalue()
-            return {"file": base64.b64encode(file_data).decode('utf-8'), "mime": "application/pdf", "filename": f"{request.filename}.pdf"}
-        elif request.format == "docx":
-            buffer = create_docx(request.content)
-            file_data = buffer.getvalue()
-            return {"file": base64.b64encode(file_data).decode('utf-8'), "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "filename": f"{request.filename}.docx"}
-        elif request.format == "csv":
-            buffer = create_csv(request.content)
-            file_data = buffer.getvalue()
-            return {"file": file_data.decode('utf-8'), "mime": "text/csv", "filename": f"{request.filename}.csv"}
-        elif request.format == "json":
-            buffer = create_json(request.content)
-            file_data = buffer.getvalue()
-            return {"file": file_data.decode('utf-8'), "mime": "application/json", "filename": f"{request.filename}.json"}
-        elif request.format == "html":
-            buffer = create_html(request.content)
-            file_data = buffer.getvalue()
-            return {"file": file_data.decode('utf-8'), "mime": "text/html", "filename": f"{request.filename}.html"}
-        else:  # txt/markdown
-            buffer = create_txt(request.content)
-            file_data = buffer.getvalue()
-            return {"file": file_data.decode('utf-8'), "mime": "text/plain", "filename": f"{request.filename}.txt"}
-    except Exception as e:
+        print(f"Log analysis error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/save-to-confluence")
@@ -1785,14 +1258,37 @@ async def save_to_confluence(request: SaveToConfluenceRequest, req: Request):
         genai.configure(api_key=api_key)
         ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
         confluence = init_confluence()
+        
+        # Validate required fields
+        if not request.space_key:
+            raise HTTPException(status_code=400, detail="space_key is required")
+        if not request.page_title:
+            raise HTTPException(status_code=400, detail="page_title is required")
+        if not request.content:
+            raise HTTPException(status_code=400, detail="content is required")
+        
         space_key = auto_detect_space(confluence, request.space_key)
+        
         # Get page by title, expand body.storage
-        page = confluence.get_page_by_title(space=space_key, title=request.page_title, expand='body.storage')
-        if not page:
-            raise HTTPException(status_code=404, detail="Page not found")
+        try:
+            page = confluence.get_page_by_title(space=space_key, title=request.page_title, expand='body.storage')
+            if not page:
+                raise HTTPException(status_code=404, detail=f"Page '{request.page_title}' not found in space '{space_key}'")
+        except Exception as e:
+            if "permission" in str(e).lower() or "access" in str(e).lower():
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Permission denied. The calling user does not have permission to view the content in space '{space_key}'. Please check your Confluence API credentials and permissions."
+                )
+            elif "not found" in str(e).lower():
+                raise HTTPException(status_code=404, detail=f"Page '{request.page_title}' not found in space '{space_key}'")
+            else:
+                raise HTTPException(status_code=500, detail=f"Error accessing Confluence: {str(e)}")
+        
         page_id = page["id"]
         existing_content = page["body"]["storage"]["value"]
         updated_body = existing_content
+        
         if request.mode == "overwrite":
             updated_body = request.content
         elif request.mode == "replace_section":
@@ -1813,18 +1309,32 @@ async def save_to_confluence(request: SaveToConfluenceRequest, req: Request):
                 f"</p>"
             )
             updated_body = existing_content + "<hr/>" + request.content + "\n" + change_log
+        
         # Update page (only once, after change_log is added)
-        confluence.update_page(
-            page_id=page_id,
-            title=request.page_title,
-            body=updated_body,
-            representation="storage"
-        )
+        try:
+            confluence.update_page(
+                page_id=page_id,
+                title=request.page_title,
+                body=updated_body,
+                representation="storage"
+            )
+        except Exception as e:
+            if "permission" in str(e).lower() or "access" in str(e).lower():
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Permission denied. The calling user does not have permission to update the page '{request.page_title}' in space '{space_key}'. Please check your Confluence API credentials and permissions."
+                )
+            else:
+                raise HTTPException(status_code=500, detail=f"Error updating page: {str(e)}")
+        
         return {
             "message": "Page updated successfully",
             "previous_version": existing_content  # This is the backup of the old content
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Test support error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/preview-save-to-confluence")

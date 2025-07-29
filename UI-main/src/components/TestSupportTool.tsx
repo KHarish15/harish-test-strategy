@@ -104,7 +104,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
         try {
           const status = await apiService.getCircleCIStatus(circleciPipeline.pipeline_id);
           
-          if (status.success) {
+          if (status && status.success) {
             setCircleciStatus(status.state || 'running');
             
             // Add log entry
@@ -113,13 +113,14 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
             // Stop polling if pipeline is finished
             if (['finished', 'failed', 'canceled', 'error'].includes(status.state || '')) {
               setIsPollingStatus(false);
-              setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Pipeline completed with status: ${status.state}`]);
             }
           } else {
-            console.error('Error polling CircleCI status:', status.error);
+            console.error('Error polling CircleCI status:', status?.error || 'Unknown error');
+            setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Polling error: ${status?.error || 'Unknown error'}`]);
           }
         } catch (err) {
           console.error('Error polling CircleCI status:', err);
+          setCircleciLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ❌ Polling failed: ${err}`]);
         }
       }, 5000); // Poll every 5 seconds
     }
@@ -639,6 +640,12 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
                           content += `Generated on: ${new Date().toLocaleString()}`;
                           
                           try {
+                            // Ensure we have valid space_key and page_title
+                            if (!space || !page) {
+                              setError('Please select both a space and a page to save to Confluence.');
+                              return;
+                            }
+                            
                             await apiService.saveToConfluence({
                               space_key: space,
                               page_title: page,
