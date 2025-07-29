@@ -25,6 +25,7 @@ from datetime import datetime
 from flowchart_generator import generate_flowchart_image
 from jira_utils import create_jira_issue
 from slack_utils import send_slack_message
+import subprocess
 
 # Load environment variables
 load_dotenv()
@@ -1017,6 +1018,24 @@ from fastapi import APIRouter, Request
 
 # Removed duplicate router endpoint to fix conflicts
 
+def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
+    # Example: generate a simple test file for demonstration. Replace with your real logic.
+    test_code = f'''
+import pytest
+from bs4 import BeautifulSoup
+
+def test_page_content():
+    assert "<html" in ''' + repr(page_content) + '''
+'''
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(test_code)
+    return filename
+
+def commit_and_push_test_file(filename: str, branch: str = "main"):
+    subprocess.run(["git", "add", filename])
+    subprocess.run(["git", "commit", "-m", f"Add dynamic test file for {filename}"])
+    subprocess.run(["git", "push", "origin", branch])
+
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
     """Test Support Tool functionality with CircleCI integration"""
@@ -1027,30 +1046,24 @@ async def test_support(request: TestRequest, req: Request):
         print(f"Test support request: {request}")  # Debug log
         confluence = init_confluence()
         space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
-        
         # Get code page
         pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
         code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
-        
         if not code_page:
             raise HTTPException(status_code=400, detail="Code page not found")
-        
         print(f"Found code page: {code_page['title']}")  # Debug log
-        
         code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
         code_content = code_data["body"]["storage"]["value"]
-        
         print(f"Code content length: {len(code_content)}")  # Debug log
-        
+        # --- DYNAMIC TEST FILE GENERATION ---
+        test_filename = generate_test_file_from_confluence(code_content)
+        commit_and_push_test_file(test_filename)
+        print(f"✅ Dynamic test file {test_filename} generated and pushed.")
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
-        
         circleci_result = trigger_circleci_pipeline("main")
-        
         if not circleci_result['success']:
             print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
-            # Continue with AI generation even if CircleCI fails
-        
         # Generate test strategy
         prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
 
