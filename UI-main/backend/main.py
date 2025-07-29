@@ -1033,10 +1033,9 @@ def extract_code_from_confluence_html(page_content: str) -> str:
     code = html.unescape(code)
     code = code.replace('<br />', '\n').replace('<br/>', '\n')
     return code
-
 def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
     code = extract_code_from_confluence_html(page_content)
-    escaped_code = repr(code)  # ensures safe Python string with escaped HTML
+    escaped_code = repr(code)  # ensures safe Python string with escaped HTML/code
     tests = []
 
     if "<form" in code:
