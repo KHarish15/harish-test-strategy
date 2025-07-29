@@ -1,4 +1,5 @@
 import pytest
+
 @pytest.mark.integration
 def test_contains_form():
     """Integration Test: Checks if the page contains a <form> element"""
