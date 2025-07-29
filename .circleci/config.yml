@@ -9,26 +9,18 @@ jobs:
       - run:
           name: Install dependencies
           command: |
-            pip install pytest requests beautifulsoup4
+            pip install pytest
       - run:
           name: Run Dynamic Tests and Summarize
           command: |
-            pytest test_login_page.py -v --tb=short | tee pytest_output.txt
+            pytest test_main.py -v --tb=short | tee pytest_output.txt
             echo "\n==================== DYNAMIC TEST SUMMARY ===================="
-            # Parse test types, names, and results
-            TEST_TYPES=$(grep -oP '(?<=Test: ).*' test_login_page.py | sort | uniq | tr '\n' ', ' | sed 's/, $//')
-            if [ -z "$TEST_TYPES" ]; then
-              TEST_TYPES=$(grep -oP 'def test_\w+' test_login_page.py | sed 's/def //g' | tr '\n' ', ' | sed 's/, $//')
-            fi
-            echo "Test Types: ${TEST_TYPES:-Unknown}"
-            TOTAL=$(grep -cE '^test_' test_login_page.py)
-            echo "Total Test Cases: $TOTAL"
-            echo "Test Case Results:"
-            grep -E '::test_' pytest_output.txt | awk '{print "  - " $1 ": " $2}'
+            TOTAL=$(grep -c 'def test_' test_main.py)
             PASSED=$(grep -c ' PASSED' pytest_output.txt)
             FAILED=$(grep -c ' FAILED' pytest_output.txt)
-            echo "Passed: $PASSED"
-            echo "Failed: $FAILED"
+            echo "Number of test cases: $TOTAL"
+            echo "Number of test cases passed: $PASSED"
+            echo "Number of test cases failed: $FAILED"
             if [ "$FAILED" -eq 0 ]; then
               echo "Final Status: PASSED"
             else

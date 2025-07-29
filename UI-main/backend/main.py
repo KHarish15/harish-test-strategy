@@ -1095,6 +1095,14 @@ def update_github_file(filename: str, repo: str, branch: str = "main"):
     r.raise_for_status()
     return r.json()
 
+def save_code_and_tests_from_confluence(code_content: str, test_content: str):
+    # Save code page as main.py
+    with open("main.py", "w", encoding="utf-8") as f:
+        f.write(code_content)
+    # Save test input page as test_main.py
+    with open("test_main.py", "w", encoding="utf-8") as f:
+        f.write(test_content)
+
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
     """Test Support Tool functionality with CircleCI integration"""
@@ -1108,16 +1116,24 @@ async def test_support(request: TestRequest, req: Request):
         # Get code page
         pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
         code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
+        test_input_page = next((p for p in pages if p["title"] == getattr(request, 'test_input_page_title', None)), None)
         if not code_page:
             raise HTTPException(status_code=400, detail="Code page not found")
         print(f"Found code page: {code_page['title']}")  # Debug log
         code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
         code_content = code_data["body"]["storage"]["value"]
         print(f"Code content length: {len(code_content)}")  # Debug log
-        # --- DYNAMIC TEST FILE GENERATION ---
-        test_filename = generate_test_file_from_confluence(code_content)
-        update_github_file(test_filename, "KHarish15/harish-test-strategy", "main")
-        print(f"✅ Dynamic test file {test_filename} updated in GitHub repo.")
+        # If test input page is provided, fetch and save both code and test files
+        if test_input_page:
+            test_data = confluence.get_page_by_id(test_input_page["id"], expand="body.storage")
+            test_content = test_data["body"]["storage"]["value"]
+            save_code_and_tests_from_confluence(code_content, test_content)
+            print("✅ Saved main.py and test_main.py for dynamic testing.")
+        else:
+            # Fallback: generate a test file from code content (legacy flow)
+            test_filename = generate_test_file_from_confluence(code_content)
+            update_github_file(test_filename, "KHarish15/harish-test-strategy", "main")
+            print(f"✅ Dynamic test file {test_filename} updated in GitHub repo.")
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
         circleci_result = trigger_circleci_pipeline("main")
