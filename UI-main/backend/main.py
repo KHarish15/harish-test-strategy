@@ -798,49 +798,69 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
         }
         
         # Add file content parameters if provided
-        if code_content and test_content:
+        if code_content:
             import base64
             
             # Check content size limits for CircleCI parameters (512 chars max)
             code_b64 = base64.b64encode(code_content.encode()).decode()
-            test_b64 = base64.b64encode(test_content.encode()).decode()
             
             print(f"🔍 DEBUG: Code content size: {len(code_content)} chars")
-            print(f"🔍 DEBUG: Test content size: {len(test_content)} chars")
             print(f"🔍 DEBUG: Code base64 size: {len(code_b64)} chars")
-            print(f"🔍 DEBUG: Test base64 size: {len(test_b64)} chars")
             
-            # Check if content is too large for CircleCI parameters
-            if len(code_b64) > 400 or len(test_b64) > 400:  # Leave some buffer
-                print(f"⚠️ File content too large for CircleCI parameters")
+            # Check if code content is too large for CircleCI parameters
+            if len(code_b64) > 400:  # Leave some buffer
+                print(f"⚠️ Code content too large for CircleCI parameters")
                 print(f"📄 Code content size: {len(code_b64)} chars")
-                print(f"🧪 Test content size: {len(test_b64)} chars")
                 print(f"📋 CircleCI limit: 512 chars per parameter")
-                print(f"💡 Suggestion: Use smaller test files or split your content")
+                print(f"💡 Suggestion: Use smaller code files or split your content")
                 print(f"🔄 Cannot proceed - content too large for CircleCI")
                 
                 return {
                     "success": False,
-                    "error": f"File content too large for CircleCI parameters. Code: {len(code_b64)} chars, Test: {len(test_b64)} chars. CircleCI limit: 512 chars per parameter. Please use smaller files or split your content.",
+                    "error": f"Code content too large for CircleCI parameters. Code: {len(code_b64)} chars. CircleCI limit: 512 chars per parameter. Please use smaller files or split your content.",
                     "setup_required": False
                 }
-            else:
-                # Content is small enough - use normal approach
-                payload["parameters"] = {
-                    "code_content": code_b64,
-                    "test_content": test_b64,
-                    "code_filename": code_filename or "python_sample.py",
-                    "test_filename": test_filename or "input_file.py"
-                }
-                print(f"🚀 Triggering CircleCI pipeline with file content")
+            
+            # Prepare parameters
+            payload["parameters"] = {
+                "code_content": code_b64,
+                "code_filename": code_filename or "python_sample.py"
+            }
+            
+            # Add test content if available
+            if test_content:
+                test_b64 = base64.b64encode(test_content.encode()).decode()
+                print(f"🔍 DEBUG: Test content size: {len(test_content)} chars")
+                print(f"🔍 DEBUG: Test base64 size: {len(test_b64)} chars")
+                
+                if len(test_b64) > 400:  # Leave some buffer
+                    print(f"⚠️ Test content too large for CircleCI parameters")
+                    print(f"🧪 Test content size: {len(test_b64)} chars")
+                    print(f"📋 CircleCI limit: 512 chars per parameter")
+                    print(f"💡 Suggestion: Use smaller test files or split your content")
+                    print(f"🔄 Cannot proceed - test content too large for CircleCI")
+                    
+                    return {
+                        "success": False,
+                        "error": f"Test content too large for CircleCI parameters. Test: {len(test_b64)} chars. CircleCI limit: 512 chars per parameter. Please use smaller files or split your content.",
+                        "setup_required": False
+                    }
+                
+                payload["parameters"]["test_content"] = test_b64
+                payload["parameters"]["test_filename"] = test_filename or "input_file.py"
+                print(f"🚀 Triggering CircleCI pipeline with code and test content")
                 print(f"📄 Code file: {code_filename or 'python_sample.py'}")
                 print(f"🧪 Test file: {test_filename or 'input_file.py'}")
+            else:
+                print(f"🚀 Triggering CircleCI pipeline with code content only")
+                print(f"📄 Code file: {code_filename or 'python_sample.py'}")
+                print(f"⚠️ No test content - CircleCI will create basic test")
         else:
             print(f"🚀 Triggering CircleCI pipeline for branch: {branch}")
-            print(f"⚠️ No file content provided - cannot proceed")
+            print(f"⚠️ No code content provided - cannot proceed")
             return {
                 "success": False,
-                "error": "No file content provided. Please ensure both code and test content are available.",
+                "error": "No code content provided. Please ensure code content is available.",
                 "setup_required": False
             }
         
@@ -1103,6 +1123,18 @@ async def test_support(request: TestRequest, req: Request):
                 print(f"Test content length: {len(test_content)}")
             else:
                 print(f"⚠️ Test input page '{request.test_input_page_title}' not found")
+        else:
+            print(f"📝 No test input page provided - will create basic test file")
+            # Create a basic test file from the code content
+            test_content = f"""import pytest
+from {request.code_page_title.replace(' ', '_').lower()} import *
+
+def test_basic():
+    # Basic test to verify the code can be imported
+    assert True
+"""
+            test_filename = f"test_{request.code_page_title.replace(' ', '_').lower()}.py"
+            print(f"Created basic test file: {test_filename}")
         
         # 🚀 TRIGGER CIRCLECI PIPELINE WITH FILE CONTENT
         print("🚀 Triggering CircleCI pipeline with file content...")
