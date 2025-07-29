@@ -808,7 +808,7 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
             print(f"🔍 DEBUG: Code base64 size: {len(code_b64)} chars")
             
             # Check if code content is too large for CircleCI parameters
-            if len(code_b64) > 400:  # Leave some buffer
+            if len(code_b64) > 500:  # Leave some buffer for CircleCI's 512 limit
                 print(f"⚠️ Code content too large for CircleCI parameters")
                 print(f"📄 Code content size: {len(code_b64)} chars")
                 print(f"📋 CircleCI limit: 512 chars per parameter")
@@ -833,7 +833,7 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
                 print(f"🔍 DEBUG: Test content size: {len(test_content)} chars")
                 print(f"🔍 DEBUG: Test base64 size: {len(test_b64)} chars")
                 
-                if len(test_b64) > 400:  # Leave some buffer
+                if len(test_b64) > 500:  # Leave some buffer for CircleCI's 512 limit
                     print(f"⚠️ Test content too large for CircleCI parameters")
                     print(f"🧪 Test content size: {len(test_b64)} chars")
                     print(f"📋 CircleCI limit: 512 chars per parameter")
