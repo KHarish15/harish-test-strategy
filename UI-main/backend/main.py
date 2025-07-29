@@ -1019,53 +1019,32 @@ from fastapi import APIRouter, Request
 
 # Removed duplicate router endpoint to fix conflicts
 
+def extract_code_from_confluence_html(page_content: str) -> str:
+    soup = BeautifulSoup(page_content, "html.parser")
+    # Try to find Confluence code macro blocks
+    code_blocks = soup.find_all('ac:plain-text-body')
+    if code_blocks:
+        code = ''.join(cb.get_text() for cb in code_blocks)
+    else:
+        # Fallback: try <pre> or <code>
+        pre = soup.find('pre')
+        code = pre.get_text() if pre else soup.get_text()
+    # Unescape HTML and clean up
+    code = html.unescape(code)
+    code = code.replace('<br />', '\n').replace('<br/>', '\n')
+    return code
+
 def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
-    # Unescape HTML entities from Confluence
-    unescaped = html.unescape(page_content)
+    code = extract_code_from_confluence_html(page_content)
     test_code = f'''
 import pytest
 
-# UNIT TEST: Check for HTML structure
 @pytest.mark.unit
-def test_contains_html():
-    """Unit Test: Page contains <html> tag"""
-    assert "<html" in {repr(unescaped)}
+def test_code_not_empty():
+    """Unit Test: Code block is not empty"""
+    assert {repr(code.strip())} != ""
 
-# UNIT TEST: Check for <form> element
-@pytest.mark.unit
-def test_contains_form():
-    """Unit Test: Page contains <form> tag"""
-    assert "<form" in {repr(unescaped)}
-
-# INTEGRATION TEST: Check for <input> fields
-@pytest.mark.integration
-def test_contains_input():
-    """Integration Test: Page contains <input> tag"""
-    assert "<input" in {repr(unescaped)}
-
-# INTEGRATION TEST: Check for <button> element
-@pytest.mark.integration
-def test_contains_button():
-    """Integration Test: Page contains <button> tag"""
-    assert "<button" in {repr(unescaped)}
-
-# E2E TEST: Check for <title> element
-@pytest.mark.e2e
-def test_contains_title():
-    """E2E Test: Page contains <title> tag"""
-    assert "<title" in {repr(unescaped)}
-
-# ACCESSIBILITY TEST: Check for lang attribute
-@pytest.mark.accessibility
-def test_html_lang():
-    """Accessibility Test: <html> tag has lang attribute"""
-    assert "lang=" in {repr(unescaped)}
-
-# SECURITY TEST: Check for password input
-@pytest.mark.security
-def test_password_input():
-    """Security Test: Page contains password input field"""
-    assert "type=\"password\"" in {repr(unescaped)}
+# Add more tests here as needed, using the cleaned code variable
 '''
     with open(filename, "w", encoding="utf-8") as f:
         f.write(test_code)
