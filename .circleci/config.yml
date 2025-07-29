@@ -71,6 +71,7 @@ jobs:
           name: Dynamic Test Summary
           command: |
             echo "📊 Generating test summary..."
+            echo "🔍 Using test file: $TEST_FILENAME"
             python run_dynamic_tests.py
 
 workflows:

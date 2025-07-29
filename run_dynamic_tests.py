@@ -1,11 +1,17 @@
 import subprocess
 import re
 import sys
+import os
 
 def run_pytest_and_parse():
-    # Run pytest and capture output
+    # Get the test filename from environment or use default
+    test_filename = os.getenv('TEST_FILENAME', 'input_file.py')
+    
+    print(f"🔍 Looking for tests in: {test_filename}")
+    
+    # Run pytest on the specific test file
     result = subprocess.run(
-        ['pytest', '--tb=short', '-q'],
+        ['pytest', test_filename, '--tb=short', '-q'],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True
