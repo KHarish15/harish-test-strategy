@@ -1,5 +1,20 @@
 version: 2.1
 
+# Define parameters that can be passed to the pipeline
+parameters:
+  code_content:
+    type: string
+    default: ""
+  test_content:
+    type: string
+    default: ""
+  code_filename:
+    type: string
+    default: "python_sample.py"
+  test_filename:
+    type: string
+    default: "input_file.py"
+
 jobs:
   test:
     docker:
