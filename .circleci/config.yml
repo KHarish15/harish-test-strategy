@@ -17,6 +17,8 @@ jobs:
             CODE_FILENAME=${CODE_FILENAME:-"python_sample.py"}
             TEST_FILENAME=${TEST_FILENAME:-"input_file.py"}
             
+            echo "📋 Using filenames: CODE_FILENAME=$CODE_FILENAME, TEST_FILENAME=$TEST_FILENAME"
+            
             # Create the code file from pipeline parameters
             if [ -n "$CODE_CONTENT" ]; then
               echo "$CODE_CONTENT" | base64 -d > "$CODE_FILENAME"
@@ -51,11 +53,18 @@ jobs:
             echo ""
             echo "🔍 Files created in current directory:"
             ls -la *.py
+            
+            # Export variables for next steps
+            echo "CODE_FILENAME=$CODE_FILENAME" >> $BASH_ENV
+            echo "TEST_FILENAME=$TEST_FILENAME" >> $BASH_ENV
       - run:
           name: Run tests
           command: |
             echo "🧪 Running tests on: $TEST_FILENAME"
             echo "📄 Using code file: $CODE_FILENAME"
+            echo ""
+            echo "🔍 Available test files:"
+            ls -la *.py
             echo ""
             python -m pytest "$TEST_FILENAME" -v --tb=short
       - run:
