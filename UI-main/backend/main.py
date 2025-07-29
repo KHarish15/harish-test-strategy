@@ -1031,10 +1031,27 @@ def test_page_content():
         f.write(test_code)
     return filename
 
-def commit_and_push_test_file(filename: str, branch: str = "main"):
-    subprocess.run(["git", "add", filename])
-    subprocess.run(["git", "commit", "-m", f"Add dynamic test file for {filename}"])
-    subprocess.run(["git", "push", "origin", branch])
+def update_github_file(filename: str, repo: str, branch: str = "main"):
+    token = os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise Exception("GITHUB_TOKEN not set in environment variables")
+    with open(filename, "r", encoding="utf-8") as f:
+        content = f.read()
+    url = f"https://api.github.com/repos/{repo}/contents/{filename}"
+    headers = {"Authorization": f"token {token}"}
+    # Get SHA if file exists
+    r = requests.get(url, headers=headers, params={"ref": branch})
+    sha = r.json().get("sha") if r.status_code == 200 else None
+    data = {
+        "message": f"Update {filename} via AI Test Support",
+        "content": base64.b64encode(content.encode()).decode(),
+        "branch": branch,
+    }
+    if sha:
+        data["sha"] = sha
+    r = requests.put(url, headers=headers, json=data)
+    r.raise_for_status()
+    return r.json()
 
 @app.post("/test-support")
 async def test_support(request: TestRequest, req: Request):
@@ -1057,8 +1074,8 @@ async def test_support(request: TestRequest, req: Request):
         print(f"Code content length: {len(code_content)}")  # Debug log
         # --- DYNAMIC TEST FILE GENERATION ---
         test_filename = generate_test_file_from_confluence(code_content)
-        commit_and_push_test_file(test_filename)
-        print(f"✅ Dynamic test file {test_filename} generated and pushed.")
+        update_github_file(test_filename, "KHarish15/harish-test-strategy", "main")
+        print(f"✅ Dynamic test file {test_filename} updated in GitHub repo.")
         # 🚀 TRIGGER CIRCLECI PIPELINE
         print("🚀 Triggering CircleCI pipeline for test strategy generation...")
         circleci_result = trigger_circleci_pipeline("main")
