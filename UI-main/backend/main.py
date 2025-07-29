@@ -26,6 +26,7 @@ from flowchart_generator import generate_flowchart_image
 from jira_utils import create_jira_issue
 from slack_utils import send_slack_message
 import subprocess
+import html
 
 # Load environment variables
 load_dotenv()
@@ -1019,13 +1020,52 @@ from fastapi import APIRouter, Request
 # Removed duplicate router endpoint to fix conflicts
 
 def generate_test_file_from_confluence(page_content: str, filename: str = "test_login_page.py"):
-    # Example: generate a simple test file for demonstration. Replace with your real logic.
+    # Unescape HTML entities from Confluence
+    unescaped = html.unescape(page_content)
     test_code = f'''
 import pytest
-from bs4 import BeautifulSoup
 
-def test_page_content():
-    assert "<html" in ''' + repr(page_content) + '''
+# UNIT TEST: Check for HTML structure
+@pytest.mark.unit
+def test_contains_html():
+    """Unit Test: Page contains <html> tag"""
+    assert "<html" in {repr(unescaped)}
+
+# UNIT TEST: Check for <form> element
+@pytest.mark.unit
+def test_contains_form():
+    """Unit Test: Page contains <form> tag"""
+    assert "<form" in {repr(unescaped)}
+
+# INTEGRATION TEST: Check for <input> fields
+@pytest.mark.integration
+def test_contains_input():
+    """Integration Test: Page contains <input> tag"""
+    assert "<input" in {repr(unescaped)}
+
+# INTEGRATION TEST: Check for <button> element
+@pytest.mark.integration
+def test_contains_button():
+    """Integration Test: Page contains <button> tag"""
+    assert "<button" in {repr(unescaped)}
+
+# E2E TEST: Check for <title> element
+@pytest.mark.e2e
+def test_contains_title():
+    """E2E Test: Page contains <title> tag"""
+    assert "<title" in {repr(unescaped)}
+
+# ACCESSIBILITY TEST: Check for lang attribute
+@pytest.mark.accessibility
+def test_html_lang():
+    """Accessibility Test: <html> tag has lang attribute"""
+    assert "lang=" in {repr(unescaped)}
+
+# SECURITY TEST: Check for password input
+@pytest.mark.security
+def test_password_input():
+    """Security Test: Page contains password input field"""
+    assert "type=\"password\"" in {repr(unescaped)}
 '''
     with open(filename, "w", encoding="utf-8") as f:
         f.write(test_code)
