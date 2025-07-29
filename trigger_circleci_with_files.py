@@ -65,12 +65,12 @@ def trigger_circleci_with_files(code_content, test_content, code_filename, test_
 
 def main():
     """
-    Example usage of the CircleCI trigger function
+    Example usage of the CircleCI trigger function with actual code and test content
     """
     print("🎯 CircleCI File Upload Trigger")
     print("=" * 40)
     
-    # Example file content
+    # Actual code content from user
     code_content = """def add(a, b):
     return a + b
 
@@ -93,8 +93,9 @@ def get_max(numbers):
         raise ValueError("Empty list provided")
     return max(numbers)"""
 
+    # Actual test content from user
     test_content = """import pytest
-from main import add, subtract, divide, multiply, is_even, get_max
+from python_sample import add, subtract, divide, multiply, is_even, get_max
 
 def test_add():
     assert add(2, 3) == 5
@@ -120,7 +121,10 @@ def test_is_even():
 def test_get_max():
     assert get_max([1, 5, 3]) == 5
     with pytest.raises(ValueError):
-        get_max([])"""
+        get_max([])
+
+def test_fail_example():
+    assert add(2, 2) == 5"""
 
     # Get CircleCI configuration
     token = os.getenv('CIRCLECI_TOKEN')
@@ -130,19 +134,20 @@ def test_get_max():
         print("❌ Please set CIRCLECI_TOKEN and CIRCLECI_PROJECT_SLUG environment variables")
         return
     
-    # Trigger CircleCI
+    # Trigger CircleCI with actual file names and content
     result = trigger_circleci_with_files(
         code_content=code_content,
         test_content=test_content,
-        code_filename="main.py",
-        test_filename="test_main.py",
+        code_filename="python_sample.py",
+        test_filename="input_file.py",
         circleci_token=token,
         project_slug=project_slug
     )
     
     if result['success']:
-        print(f"\n🎉 SUCCESS! CircleCI pipeline triggered with file content.")
-        print(f"📊 Check results at: {result['dashboard_url']}")
+        print(f"\n🎉 SUCCESS! CircleCI pipeline triggered with actual file content.")
+        print(f"📊 Expected results: 7 test cases (6 passed, 1 failed)")
+        print(f"🔗 Check results at: {result['dashboard_url']}")
     else:
         print(f"\n❌ FAILED: {result['error']}")
 
