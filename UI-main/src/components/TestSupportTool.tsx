@@ -43,10 +43,11 @@ interface TestRecommendations {
 
 // Add this utility to parse test results from backend response (mockup for demonstration)
 function parseTestResultsFromLogs(logs: string) {
-  // This should parse the logs string and extract pass/fail counts and details
-  // For now, just a mockup
+  if (!logs || logs.includes('ERROR collecting')) {
+    return { passed: 0, failed: 0, logs, error: 'No valid tests found or test file is invalid.' };
+  }
   const passed = (logs.match(/PASSED/g) || []).length;
-  const failed = (logs.match(/FAILED/g) || []).length;
+  const failed = (logs.match(/FAILED|ERROR/g) || []).length;
   return { passed, failed, logs };
 }
 
@@ -75,7 +76,7 @@ const TestSupportTool: React.FC<TestSupportToolProps> = ({ onClose, onFeatureSel
   const [circleciStatus, setCircleciStatus] = useState<string>('idle');
   const [circleciLogs, setCircleciLogs] = useState<string[]>([]);
   const [isPollingStatus, setIsPollingStatus] = useState(false);
-  const [testResults, setTestResults] = useState<{passed: number, failed: number, logs: string} | null>(null);
+  const [testResults, setTestResults] = useState<{passed: number, failed: number, logs: string, error?: string} | null>(null);
 
   const features = [
     { id: 'search' as const, label: 'AI Powered Search', icon: Search },
@@ -428,7 +429,8 @@ ${qaResults.map(qa => `**Q:** ${qa.question}\n**A:** ${qa.answer}`).join('\n\n')
       }
     } catch (err) {
       setCircleciStatus('failed');
-      setError('Could not fetch test results. Please check CircleCI.');
+      setTestResults({ passed: 0, failed: 0, logs: '', error: 'Could not fetch test results. Please check CircleCI or your test file.' });
+      setError('Could not fetch test results. Please check CircleCI or your test file.');
     }
   };
 
