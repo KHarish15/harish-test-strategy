@@ -41,11 +41,9 @@ jobs:
               echo "📄 Code file contents:"
               cat "$CODE_FILENAME"
             else
-              echo "⚠️ No CODE_CONTENT provided, creating minimal sample file"
-              echo 'def add(a, b): return a + b' > "$CODE_FILENAME"
-              echo "✅ Created sample code file: $CODE_FILENAME"
-              echo "📄 Sample code file contents:"
-              cat "$CODE_FILENAME"
+              echo "⚠️ No CODE_CONTENT provided - cannot create code file"
+              echo "❌ Pipeline will fail - code content is required"
+              exit 1
             fi
             
             echo ""
@@ -57,12 +55,9 @@ jobs:
               echo "📄 Test file contents:"
               cat "$TEST_FILENAME"
             else
-              echo "⚠️ No TEST_CONTENT provided, creating minimal test file"
-              echo 'import pytest' > "$TEST_FILENAME"
-              echo 'def test_add(): assert True' >> "$TEST_FILENAME"
-              echo "✅ Created sample test file: $TEST_FILENAME"
-              echo "📄 Sample test file contents:"
-              cat "$TEST_FILENAME"
+              echo "⚠️ No TEST_CONTENT provided - cannot create test file"
+              echo "❌ Pipeline will fail - test content is required"
+              exit 1
             fi
             
             echo ""
