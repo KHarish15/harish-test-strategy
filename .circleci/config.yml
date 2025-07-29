@@ -40,7 +40,7 @@ jobs:
       - run:
           name: Create HTML test file
           command: |
-            cat > login_page.html << 'EOF'
+            cat > login_page.html \<< 'EOF'
             <!DOCTYPE html>
             <html lang="en">
             <head>
@@ -128,7 +128,7 @@ jobs:
           command: |
             echo "🧪 Creating dynamic test cases for login page with realistic failures..."
             
-            cat > test_login_page.py << 'EOF'
+            cat > test_login_page.py \<< 'EOF'
             import pytest
             from bs4 import BeautifulSoup
             import re
@@ -329,9 +329,9 @@ jobs:
                 "failed": 3,
                 "success_rate": "70%",
                 "execution_time": "$(date -Iseconds)",
-                "pipeline_info": {
-                  "branch": "$CIRCLE_BRANCH",
-                  "commit": "$CIRCLE_SHA1",
+              "pipeline_info": {
+                "branch": "$CIRCLE_BRANCH",
+                "commit": "$CIRCLE_SHA1",
                   "build_number": "$CIRCLE_BUILD_NUM",
                   "triggered_by": "Test Support Tool"
                 }
