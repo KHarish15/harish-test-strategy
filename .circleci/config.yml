@@ -11,9 +11,26 @@ jobs:
           command: |
             pip install pytest requests
       - run:
+          name: Create uploaded files
+          command: |
+            # Create the code file from pipeline parameters
+            echo "$CODE_CONTENT" | base64 -d > "$CODE_FILENAME"
+            echo "✅ Created code file: $CODE_FILENAME"
+            
+            # Create the test file from pipeline parameters  
+            echo "$TEST_CONTENT" | base64 -d > "$TEST_FILENAME"
+            echo "✅ Created test file: $TEST_FILENAME"
+            
+            # Show file contents for verification
+            echo "📄 Code file contents:"
+            cat "$CODE_FILENAME"
+            echo ""
+            echo "📄 Test file contents:"
+            cat "$TEST_FILENAME"
+      - run:
           name: Run tests
           command: |
-            python -m pytest -v --tb=short
+            python -m pytest "$TEST_FILENAME" -v --tb=short
       - run:
           name: Dynamic Test Summary
           command: |
