@@ -119,6 +119,8 @@ jobs:
             # Create the test file from pipeline parameters  
             if [ -n "$TEST_CONTENT" ]; then
               echo "🔍 Attempting to decode TEST_CONTENT..."
+              echo "🔍 TEST_CONTENT length: ${#TEST_CONTENT}"
+              echo "🔍 TEST_CONTENT preview: ${TEST_CONTENT:0:100}..."
               if echo "$TEST_CONTENT" | base64 -d > "$TEST_FILENAME" 2>/dev/null; then
                 echo "✅ Created test file from provided content: $TEST_FILENAME"
                 echo "📄 Test file contents:"
@@ -136,6 +138,9 @@ jobs:
                 echo "🔍 Updated imports to use: $code_module_name"
                 echo "📄 Updated test file contents:"
                 cat "$TEST_FILENAME"
+                echo ""
+                echo "🔍 File size after update: $(wc -c < "$TEST_FILENAME") bytes"
+                echo "🔍 File exists and has content: $([ -f "$TEST_FILENAME" ] && [ -s "$TEST_FILENAME" ] && echo "YES" || echo "NO")"
               else
                 echo "❌ Failed to decode TEST_CONTENT - invalid base64"
                 echo "🔍 TEST_CONTENT preview: ${TEST_CONTENT:0:50}..."
@@ -145,7 +150,12 @@ jobs:
             fi
             
             # Only generate test file if TEST_CONTENT was not provided or failed to decode
-            if [ ! -f "$TEST_FILENAME" ] || [ -z "$TEST_CONTENT" ]; then
+            echo "🔍 Checking if test file was successfully created..."
+            echo "🔍 Test file exists: $([ -f "$TEST_FILENAME" ] && echo "YES" || echo "NO")"
+            echo "🔍 Test file has content: $([ -s "$TEST_FILENAME" ] && echo "YES" || echo "NO")"
+            echo "🔍 TEST_CONTENT provided: $([ -n "$TEST_CONTENT" ] && echo "YES" || echo "NO")"
+            
+            if [ ! -f "$TEST_FILENAME" ] || [ -z "$TEST_CONTENT" ] || [ ! -s "$TEST_FILENAME" ]; then
               echo "⚠️ No valid TEST_CONTENT provided - creating basic test file"
               # Create a basic test file that imports the code
               echo 'import pytest' > "$TEST_FILENAME"
