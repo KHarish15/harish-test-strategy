@@ -246,10 +246,21 @@ def auto_detect_space(confluence, space_key: Optional[str] = None) -> str:
     """
     if space_key:
         return space_key
-    spaces = confluence.get_all_spaces(start=0, limit=100)["results"]
-    if len(spaces) == 1:
-        return spaces[0]["key"]
-    raise HTTPException(status_code=400, detail="Multiple spaces found. Please specify a space_key.")
+    
+    print(f"🔍 Auto-detecting Confluence space...")
+    try:
+        spaces = confluence.get_all_spaces(start=0, limit=100)["results"]
+        print(f"✅ Found {len(spaces)} spaces")
+        if len(spaces) == 1:
+            space_key = spaces[0]["key"]
+            print(f"✅ Auto-detected space: {space_key}")
+            return space_key
+        else:
+            print(f"⚠️ Multiple spaces found: {[s['key'] for s in spaces]}")
+            raise HTTPException(status_code=400, detail="Multiple spaces found. Please specify a space_key.")
+    except Exception as e:
+        print(f"❌ Failed to auto-detect space: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to auto-detect space: {str(e)}")
 
 # API Endpoints
 @app.get("/")
@@ -1179,14 +1190,34 @@ async def test_support(request: TestRequest, req: Request):
     """Test Support Tool functionality with CircleCI integration"""
     try:
         api_key = get_actual_api_key_from_identifier(req.headers.get('x-api-key'))
-        genai.configure(api_key=api_key)
-        ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
+        print(f"🔍 Configuring AI model...")
+        try:
+            genai.configure(api_key=api_key)
+            ai_model = genai.GenerativeModel("models/gemini-1.5-flash-8b-latest")
+            print(f"✅ AI model configured successfully")
+        except Exception as e:
+            print(f"❌ Failed to configure AI model: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to configure AI model: {str(e)}")
         print(f"Test support request: {request}")  # Debug log
-        confluence = init_confluence()
+        print(f"🔍 Initializing Confluence connection...")
+        try:
+            confluence = init_confluence()
+            print(f"✅ Confluence connection established")
+        except Exception as e:
+            print(f"❌ Failed to initialize Confluence: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to initialize Confluence: {str(e)}")
+        
         space_key = auto_detect_space(confluence, getattr(request, 'space_key', None))
         
-        # Get code page
-        pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
+        # Get code page with timeout protection
+        print(f"🔍 Fetching pages from Confluence space: {space_key}")
+        try:
+            pages = confluence.get_all_pages_from_space(space=space_key, start=0, limit=50)
+            print(f"✅ Retrieved {len(pages)} pages from Confluence")
+        except Exception as e:
+            print(f"❌ Failed to fetch pages from Confluence: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch pages from Confluence: {str(e)}")
+        
         code_page = next((p for p in pages if p["title"] == request.code_page_title), None)
         
         if not code_page:
@@ -1194,8 +1225,14 @@ async def test_support(request: TestRequest, req: Request):
         
         print(f"Found code page: {code_page['title']}")  # Debug log
         
-        code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
-        code_content = code_data["body"]["storage"]["value"]
+        print(f"🔍 Fetching code page content...")
+        try:
+            code_data = confluence.get_page_by_id(code_page["id"], expand="body.storage")
+            code_content = code_data["body"]["storage"]["value"]
+            print(f"✅ Retrieved code content ({len(code_content)} chars)")
+        except Exception as e:
+            print(f"❌ Failed to fetch code page content: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to fetch code page content: {str(e)}")
         
         print(f"Code content length: {len(code_content)}")  # Debug log
         
@@ -1205,11 +1242,18 @@ async def test_support(request: TestRequest, req: Request):
         if request.test_input_page_title:
             test_page = next((p for p in pages if p["title"] == request.test_input_page_title), None)
             if test_page:
-                test_data = confluence.get_page_by_id(test_page["id"], expand="body.storage")
-                test_content = test_data["body"]["storage"]["value"]
-                test_filename = f"{request.test_input_page_title}.py"
-                print(f"Found test input page: {test_page['title']}")
-                print(f"Test content length: {len(test_content)}")
+                print(f"🔍 Fetching test page content...")
+                try:
+                    test_data = confluence.get_page_by_id(test_page["id"], expand="body.storage")
+                    test_content = test_data["body"]["storage"]["value"]
+                    test_filename = f"{request.test_input_page_title}.py"
+                    print(f"✅ Found test input page: {test_page['title']}")
+                    print(f"✅ Test content length: {len(test_content)}")
+                except Exception as e:
+                    print(f"❌ Failed to fetch test page content: {e}")
+                    print(f"⚠️ Continuing without test page content")
+                    test_content = None
+                    test_filename = None
             else:
                 print(f"⚠️ Test input page '{request.test_input_page_title}' not found")
         else:
