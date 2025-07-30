@@ -1235,12 +1235,26 @@ def test_basic():
             clean_test_content = clean_test_content[:250] + "\n\n# ... Content truncated for CircleCI compatibility"
             print(f"🧪 Truncated test content length: {len(clean_test_content)}")
         
+        # Clean filenames - remove spaces and ensure proper extension
+        clean_code_filename = request.code_page_title.replace(' ', '_')
+        if not clean_code_filename.endswith('.py'):
+            clean_code_filename += '.py'
+        
+        clean_test_filename = test_filename
+        if clean_test_filename:
+            clean_test_filename = clean_test_filename.replace(' ', '_')
+            if not clean_test_filename.endswith('.py'):
+                clean_test_filename += '.py'
+        
+        print(f"🔍 Debug: Clean code filename: {clean_code_filename}")
+        print(f"🔍 Debug: Clean test filename: {clean_test_filename}")
+        
         circleci_result = trigger_circleci_pipeline(
             branch="main",
             code_content=clean_code_content,
             test_content=clean_test_content,
-            code_filename=f"{request.code_page_title}.py",
-            test_filename=test_filename
+            code_filename=clean_code_filename,
+            test_filename=clean_test_filename
         )
         
         if not circleci_result['success']:

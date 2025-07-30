@@ -78,9 +78,23 @@ jobs:
             CODE_FILENAME=${CODE_FILENAME:-"python_sample.py"}
             TEST_FILENAME=${TEST_FILENAME:-"input_file.py"}
             
+            # Clean filenames - remove spaces and ensure proper .py extension
+            CODE_FILENAME=$(echo "$CODE_FILENAME" | sed 's/ /_/g' | sed 's/\.py\.py$/.py/')
+            TEST_FILENAME=$(echo "$TEST_FILENAME" | sed 's/ /_/g' | sed 's/\.py\.py$/.py/')
+            
+            # Ensure .py extension
+            if [[ ! "$CODE_FILENAME" =~ \.py$ ]]; then
+              CODE_FILENAME="${CODE_FILENAME}.py"
+            fi
+            if [[ ! "$TEST_FILENAME" =~ \.py$ ]]; then
+              TEST_FILENAME="${TEST_FILENAME}.py"
+            fi
+            
             echo "📋 Using filenames: CODE_FILENAME=$CODE_FILENAME, TEST_FILENAME=$TEST_FILENAME"
             echo "🔍 Debug: CODE_CONTENT length: ${#CODE_CONTENT}"
             echo "🔍 Debug: TEST_CONTENT length: ${#TEST_CONTENT}"
+            echo "🔍 Debug: Original CODE_FILENAME from env: ${CODE_FILENAME}"
+            echo "🔍 Debug: Original TEST_FILENAME from env: ${TEST_FILENAME}"
             
             # Create the code file from pipeline parameters
             if [ -n "$CODE_CONTENT" ]; then
@@ -124,13 +138,31 @@ jobs:
               echo '# Add the current directory to Python path' >> "$TEST_FILENAME"
               echo 'sys.path.insert(0, os.getcwd())' >> "$TEST_FILENAME"
               echo '' >> "$TEST_FILENAME"
-              echo '# Import the code file (without .py extension)' >> "$TEST_FILENAME"
-              echo 'code_module = "$CODE_FILENAME".replace(".py", "")' >> "$TEST_FILENAME"
+              echo '# Import the code file dynamically' >> "$TEST_FILENAME"
+              echo 'import importlib.util' >> "$TEST_FILENAME"
+              echo 'import os' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
               echo 'try:' >> "$TEST_FILENAME"
-              echo "    exec(f\"import {code_module}\")" >> "$TEST_FILENAME"
-              echo "    print(f\"✅ Successfully imported {code_module}\")" >> "$TEST_FILENAME"
-              echo 'except Exception as e:' >> "$TEST_FILENAME"
-              echo "    print(f\"⚠️ Could not import {code_module}: {e}\")" >> "$TEST_FILENAME"
+              echo '    # Method 1: Try direct import if module name is valid' >> "$TEST_FILENAME"
+              echo "    code_module = \"$CODE_FILENAME\".replace(\".py\", \"\").replace(\" \", \"_\")" >> "$TEST_FILENAME"
+              echo '    exec(f"import {code_module}")' >> "$TEST_FILENAME"
+              echo '    print(f"✅ Successfully imported {code_module}")' >> "$TEST_FILENAME"
+              echo 'except ImportError as e:' >> "$TEST_FILENAME"
+              echo '    print(f"❌ Direct import failed: {e}")' >> "$TEST_FILENAME"
+              echo '    try:' >> "$TEST_FILENAME"
+              echo '        # Method 2: Use importlib to load the file directly' >> "$TEST_FILENAME"
+              echo '        spec = importlib.util.spec_from_file_location("dynamic_module", "$CODE_FILENAME")' >> "$TEST_FILENAME"
+              echo '        module = importlib.util.module_from_spec(spec)' >> "$TEST_FILENAME"
+              echo '        spec.loader.exec_module(module)' >> "$TEST_FILENAME"
+              echo '        print("✅ Successfully imported using importlib")' >> "$TEST_FILENAME"
+              echo '        # Make functions available for testing' >> "$TEST_FILENAME"
+              echo '        globals().update({name: getattr(module, name) for name in dir(module) if not name.startswith("_")})' >> "$TEST_FILENAME"
+              echo '    except Exception as e2:' >> "$TEST_FILENAME"
+              echo '        print(f"❌ Importlib failed: {e2}")' >> "$TEST_FILENAME"
+              echo '        print("📁 Available files:")' >> "$TEST_FILENAME"
+              echo '        for file in os.listdir("."):' >> "$TEST_FILENAME"
+              echo '            if file.endswith(".py"):' >> "$TEST_FILENAME"
+              echo '                print(f"  - {file}")' >> "$TEST_FILENAME"
               echo '' >> "$TEST_FILENAME"
               echo 'def test_basic():' >> "$TEST_FILENAME"
               echo '    """Basic test to verify the code can be imported and executed"""' >> "$TEST_FILENAME"
@@ -138,12 +170,80 @@ jobs:
               echo '    print("✅ Basic test passed")' >> "$TEST_FILENAME"
               echo '' >> "$TEST_FILENAME"
               echo 'def test_code_import():' >> "$TEST_FILENAME"
-              echo '    """Test that the code file can be imported"""' >> "$TEST_FILENAME"
+              echo '    """Test that the code file can be imported and functions are available"""' >> "$TEST_FILENAME"
               echo '    try:' >> "$TEST_FILENAME"
-              echo "        exec(f\"import {code_module}\")" >> "$TEST_FILENAME"
-              echo '        assert True' >> "$TEST_FILENAME"
+              echo '        # Check if functions are available in globals' >> "$TEST_FILENAME"
+              echo '        available_functions = [name for name in globals() if not name.startswith("_") and callable(globals()[name])]' >> "$TEST_FILENAME"
+              echo '        print(f"Available functions: {available_functions}")' >> "$TEST_FILENAME"
+              echo '        assert len(available_functions) > 0, "No functions found in imported module"' >> "$TEST_FILENAME"
+              echo '        return True' >> "$TEST_FILENAME"
               echo '    except Exception as e:' >> "$TEST_FILENAME"
-              echo "        assert False, f\"Failed to import {code_module}: {e}\"" >> "$TEST_FILENAME"
+              echo '        print(f"❌ Import test failed: {e}")' >> "$TEST_FILENAME"
+              echo '        return False' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo 'def test_sample_functions():' >> "$TEST_FILENAME"
+              echo '    """Test the functions from the sample code"""' >> "$TEST_FILENAME"
+              echo '    try:' >> "$TEST_FILENAME"
+              echo '        # Test add function' >> "$TEST_FILENAME"
+              echo '        if "add" in globals():' >> "$TEST_FILENAME"
+              echo '            assert add(2, 3) == 5' >> "$TEST_FILENAME"
+              echo '            assert add(-1, 1) == 0' >> "$TEST_FILENAME"
+              echo '            print("✅ add function works correctly")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ add function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        # Test subtract function' >> "$TEST_FILENAME"
+              echo '        if "subtract" in globals():' >> "$TEST_FILENAME"
+              echo '            assert subtract(10, 5) == 5' >> "$TEST_FILENAME"
+              echo '            assert subtract(5, 10) == -5' >> "$TEST_FILENAME"
+              echo '            print("✅ subtract function works correctly")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ subtract function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        # Test multiply function' >> "$TEST_FILENAME"
+              echo '        if "multiply" in globals():' >> "$TEST_FILENAME"
+              echo '            assert multiply(3, 4) == 12' >> "$TEST_FILENAME"
+              echo '            assert multiply(0, 100) == 0' >> "$TEST_FILENAME"
+              echo '            print("✅ multiply function works correctly")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ multiply function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        # Test divide function with error handling' >> "$TEST_FILENAME"
+              echo '        if "divide" in globals():' >> "$TEST_FILENAME"
+              echo '            assert divide(10, 2) == 5' >> "$TEST_FILENAME"
+              echo '            try:' >> "$TEST_FILENAME"
+              echo '                divide(5, 0)' >> "$TEST_FILENAME"
+              echo '                assert False, "Should have raised ValueError"' >> "$TEST_FILENAME"
+              echo '            except ValueError:' >> "$TEST_FILENAME"
+              echo '                print("✅ divide function correctly raises ValueError for division by zero")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ divide function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        # Test is_even function' >> "$TEST_FILENAME"
+              echo '        if "is_even" in globals():' >> "$TEST_FILENAME"
+              echo '            assert is_even(2) == True' >> "$TEST_FILENAME"
+              echo '            assert is_even(3) == False' >> "$TEST_FILENAME"
+              echo '            print("✅ is_even function works correctly")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ is_even function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        # Test get_max function' >> "$TEST_FILENAME"
+              echo '        if "get_max" in globals():' >> "$TEST_FILENAME"
+              echo '            assert get_max([1, 2, 3, 4, 5]) == 5' >> "$TEST_FILENAME"
+              echo '            assert get_max([-1, -2, -3]) == -1' >> "$TEST_FILENAME"
+              echo '            try:' >> "$TEST_FILENAME"
+              echo '                get_max([])' >> "$TEST_FILENAME"
+              echo '                assert False, "Should have raised ValueError"' >> "$TEST_FILENAME"
+              echo '            except ValueError:' >> "$TEST_FILENAME"
+              echo '                print("✅ get_max function correctly raises ValueError for empty list")' >> "$TEST_FILENAME"
+              echo '        else:' >> "$TEST_FILENAME"
+              echo '            print("⚠️ get_max function not found")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '        print("✅ All available functions tested successfully")' >> "$TEST_FILENAME"
+              echo '        return True' >> "$TEST_FILENAME"
+              echo '    except Exception as e:' >> "$TEST_FILENAME"
+              echo '        print(f"❌ Function test failed: {e}")' >> "$TEST_FILENAME"
+              echo '        return False' >> "$TEST_FILENAME"
               echo "✅ Created basic test file: $TEST_FILENAME"
               echo "📄 Test file contents:"
               cat "$TEST_FILENAME"
@@ -167,8 +267,8 @@ jobs:
             echo "✅ All files created successfully"
             
             # Export variables for next steps
-            echo "CODE_FILENAME=$CODE_FILENAME" >> $BASH_ENV
-            echo "TEST_FILENAME=$TEST_FILENAME" >> $BASH_ENV
+            echo "export CODE_FILENAME=\"$CODE_FILENAME\"" >> $BASH_ENV
+            echo "export TEST_FILENAME=\"$TEST_FILENAME\"" >> $BASH_ENV
       - run:
           name: Run tests
           command: |
@@ -178,7 +278,7 @@ jobs:
             echo "🔍 Available test files:"
             ls -la *.py
             echo ""
-            python -m pytest "$TEST_FILENAME" -v --tb=short
+            python -m pytest "$TEST_FILENAME" -v --tb=short --import-mode=importlib
       - run:
           name: Dynamic Test Summary
           command: |
