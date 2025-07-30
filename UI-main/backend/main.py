@@ -793,6 +793,10 @@ CIRCLECI_API_BASE = "https://circleci.com/api/v2"
 def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None, test_content=None, code_filename=None, test_filename=None):
     """Trigger a new CircleCI pipeline with file content"""
     try:
+        print(f"🔍 Checking CircleCI configuration...")
+        print(f"🔍 API Token configured: {'Yes' if CIRCLECI_API_TOKEN and CIRCLECI_API_TOKEN != 'your-circleci-token' else 'No'}")
+        print(f"🔍 Project Slug configured: {'Yes' if CIRCLECI_PROJECT_SLUG and CIRCLECI_PROJECT_SLUG != 'github/your-username/your-repo' else 'No'}")
+        
         # Check if CircleCI is properly configured
         if CIRCLECI_API_TOKEN == 'your-circleci-token' or not CIRCLECI_API_TOKEN:
             print("⚠️ CircleCI not configured - skipping pipeline trigger")
@@ -927,7 +931,32 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
         print(f"📋 Payload: {payload}")
         print(f"🔗 CircleCI Dashboard URL: https://app.circleci.com/pipelines/{CIRCLECI_PROJECT_SLUG}")
         
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        # Add better timeout and error handling
+        try:
+            print(f"🚀 Making CircleCI API request with 15-second timeout...")
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            print(f"✅ CircleCI API request completed in {response.elapsed.total_seconds():.2f} seconds")
+        except requests.exceptions.Timeout:
+            print(f"❌ CircleCI API request timed out after 15 seconds")
+            return {
+                "success": False,
+                "error": "CircleCI API request timed out. The service may be down or experiencing issues.",
+                "setup_required": False
+            }
+        except requests.exceptions.ConnectionError as e:
+            print(f"❌ CircleCI API connection error: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to connect to CircleCI API: {str(e)}. Please check your internet connection.",
+                "setup_required": False
+            }
+        except requests.exceptions.RequestException as e:
+            print(f"❌ CircleCI API request failed: {e}")
+            return {
+                "success": False,
+                "error": f"CircleCI API request failed: {str(e)}",
+                "setup_required": False
+            }
         
         if response.status_code == 201:
             pipeline_data = response.json()
@@ -1249,19 +1278,29 @@ def test_basic():
         print(f"🔍 Debug: Clean code filename: {clean_code_filename}")
         print(f"🔍 Debug: Clean test filename: {clean_test_filename}")
         
-        circleci_result = trigger_circleci_pipeline(
-            branch="main",
-            code_content=clean_code_content,
-            test_content=clean_test_content,
-            code_filename=clean_code_filename,
-            test_filename=clean_test_filename
-        )
-        
-        if not circleci_result['success']:
-            print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
-            # Continue with AI generation even if CircleCI fails
-            # Add a note about the CircleCI failure to the response
-            circleci_result['note'] = "CircleCI integration failed, but AI analysis continues"
+        # Check if CircleCI is configured before attempting to trigger
+        if CIRCLECI_API_TOKEN == 'your-circleci-token' or not CIRCLECI_API_TOKEN:
+            print("⚠️ CircleCI not configured - skipping pipeline trigger and continuing with AI analysis")
+            circleci_result = {
+                "success": False,
+                "error": "CircleCI not configured. Please set CIRCLECI_API_TOKEN environment variable.",
+                "setup_required": True,
+                "note": "CircleCI integration skipped, but AI analysis continues"
+            }
+        else:
+            circleci_result = trigger_circleci_pipeline(
+                branch="main",
+                code_content=clean_code_content,
+                test_content=clean_test_content,
+                code_filename=clean_code_filename,
+                test_filename=clean_test_filename
+            )
+            
+            if not circleci_result['success']:
+                print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
+                # Continue with AI generation even if CircleCI fails
+                # Add a note about the CircleCI failure to the response
+                circleci_result['note'] = "CircleCI integration failed, but AI analysis continues"
         
         # Generate test strategy
         prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
@@ -1314,8 +1353,14 @@ Make sure each section heading is **clearly labeled** and includes a **percentag
 
 Please ensure the percentages add up to 100% and provide specific, actionable recommendations."""
         
-        response_strategy = ai_model.generate_content(prompt_strategy)
-        strategy_content = response_strategy.text
+        print(f"🤖 Generating test strategy with AI...")
+        try:
+            response_strategy = ai_model.generate_content(prompt_strategy)
+            strategy_content = response_strategy.text
+            print(f"✅ Test strategy generated successfully")
+        except Exception as e:
+            print(f"❌ AI strategy generation failed: {e}")
+            strategy_content = "Error generating test strategy. Please try again."
         
         # Generate cross-platform testing strategy
         prompt_cross_platform = f"""Based on the code:\n\n{code_content[:2000]}\n\nGenerate a **cross-platform testing strategy** covering:
@@ -1352,8 +1397,14 @@ Please ensure the percentages add up to 100% and provide specific, actionable re
 
 Provide specific test scenarios and tools for each category."""
         
-        response_cross_platform = ai_model.generate_content(prompt_cross_platform)
-        cross_platform_content = response_cross_platform.text
+        print(f"🤖 Generating cross-platform testing strategy...")
+        try:
+            response_cross_platform = ai_model.generate_content(prompt_cross_platform)
+            cross_platform_content = response_cross_platform.text
+            print(f"✅ Cross-platform strategy generated successfully")
+        except Exception as e:
+            print(f"❌ AI cross-platform generation failed: {e}")
+            cross_platform_content = "Error generating cross-platform strategy. Please try again."
         
         # Generate test sensitivity analysis
         prompt_sensitivity = f"""Analyze the following code for **test sensitivity** and **flaky test prevention**:
@@ -1394,8 +1445,14 @@ Provide a comprehensive analysis covering:
 
 Provide specific examples and code snippets for each category."""
         
-        response_sensitivity = ai_model.generate_content(prompt_sensitivity)
-        sensitivity_content = response_sensitivity.text
+        print(f"🤖 Generating test sensitivity analysis...")
+        try:
+            response_sensitivity = ai_model.generate_content(prompt_sensitivity)
+            sensitivity_content = response_sensitivity.text
+            print(f"✅ Sensitivity analysis generated successfully")
+        except Exception as e:
+            print(f"❌ AI sensitivity analysis failed: {e}")
+            sensitivity_content = "Error generating sensitivity analysis. Please try again."
         
         # Prepare response with CircleCI information
         result = {
