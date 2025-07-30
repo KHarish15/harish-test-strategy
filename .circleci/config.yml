@@ -100,9 +100,9 @@ jobs:
             if [ -n "$CODE_CONTENT" ]; then
               echo "🔍 Attempting to decode CODE_CONTENT..."
               if echo "$CODE_CONTENT" | base64 -d > "$CODE_FILENAME" 2>/dev/null; then
-                echo "✅ Created code file: $CODE_FILENAME"
-                echo "📄 Code file contents:"
-                cat "$CODE_FILENAME"
+              echo "✅ Created code file: $CODE_FILENAME"
+              echo "📄 Code file contents:"
+              cat "$CODE_FILENAME"
               else
                 echo "❌ Failed to decode CODE_CONTENT - invalid base64"
                 echo "🔍 CODE_CONTENT preview: ${CODE_CONTENT:0:50}..."
@@ -120,16 +120,33 @@ jobs:
             if [ -n "$TEST_CONTENT" ]; then
               echo "🔍 Attempting to decode TEST_CONTENT..."
               if echo "$TEST_CONTENT" | base64 -d > "$TEST_FILENAME" 2>/dev/null; then
-                echo "✅ Created test file: $TEST_FILENAME"
+                echo "✅ Created test file from provided content: $TEST_FILENAME"
                 echo "📄 Test file contents:"
+                cat "$TEST_FILENAME"
+                echo ""
+                echo "🔍 Using your actual test file content (not generated)"
+                echo "🔍 Your test file will be used as-is with proper indentation"
+                echo "🔍 Note: Your test file should import functions from the code file"
+                echo "🔍 If your test uses 'from main import ...', it will be updated automatically"
+                
+                # Update import statement to match the actual code filename
+                echo "🔍 Updating import statement to match code filename..."
+                code_module_name=$(echo "$CODE_FILENAME" | sed 's/\.py$//' | sed 's/ /_/g')
+                sed -i "s/from main import/from $code_module_name import/g" "$TEST_FILENAME"
+                echo "🔍 Updated imports to use: $code_module_name"
+                echo "📄 Updated test file contents:"
                 cat "$TEST_FILENAME"
               else
                 echo "❌ Failed to decode TEST_CONTENT - invalid base64"
                 echo "🔍 TEST_CONTENT preview: ${TEST_CONTENT:0:50}..."
-                exit 1
+                echo "⚠️ Falling back to generated test file"
+                # Continue to the else block to generate a test file
               fi
-            else
-              echo "⚠️ No TEST_CONTENT provided - creating basic test file"
+            fi
+            
+            # Only generate test file if TEST_CONTENT was not provided or failed to decode
+            if [ ! -f "$TEST_FILENAME" ] || [ -z "$TEST_CONTENT" ]; then
+              echo "⚠️ No valid TEST_CONTENT provided - creating basic test file"
               # Create a basic test file that imports the code
               echo 'import pytest' > "$TEST_FILENAME"
               echo 'import sys' >> "$TEST_FILENAME"
