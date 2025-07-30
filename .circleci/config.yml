@@ -19,12 +19,60 @@ jobs:
   test:
     docker:
       - image: cimg/python:3.10
+    environment:
+      CODE_CONTENT: << pipeline.parameters.code_content >>
+      TEST_CONTENT: << pipeline.parameters.test_content >>
+      CODE_FILENAME: << pipeline.parameters.code_filename >>
+      TEST_FILENAME: << pipeline.parameters.test_filename >>
     steps:
       - checkout
       - run:
           name: Install dependencies
           command: |
             pip install pytest requests
+      - run:
+          name: Setup test environment
+          command: |
+            # Copy run_dynamic_tests.py if it exists in the repository
+            if [ -f "run_dynamic_tests.py" ]; then
+              echo "✅ Found run_dynamic_tests.py"
+            else
+              echo "⚠️ run_dynamic_tests.py not found - creating basic version"
+              cat > run_dynamic_tests.py << 'EOF'
+import subprocess
+import re
+import sys
+import os
+
+def run_pytest_and_parse():
+    test_filename = os.getenv('TEST_FILENAME', 'input_file.py')
+    print(f"🔍 Looking for tests in: {test_filename}")
+    
+    result = subprocess.run(
+        ['pytest', test_filename, '--tb=short', '-q'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    output = result.stdout
+
+    passed = failed = 0
+    summary_match = re.search(r'(\d+) passed', output)
+    if summary_match:
+        passed = int(summary_match.group(1))
+    failed_match = re.search(r'(\d+) failed', output)
+    if failed_match:
+        failed = int(failed_match.group(1))
+    total = passed + failed
+
+    print(f"No of test cases: {total}")
+    print(f"No of test cases passed: {passed}")
+    print(f"No of test cases failed: {failed}")
+
+if __name__ == "__main__":
+    run_pytest_and_parse()
+EOF
+            fi
       - run:
           name: Create uploaded files
           command: |
@@ -33,13 +81,21 @@ jobs:
             TEST_FILENAME=${TEST_FILENAME:-"input_file.py"}
             
             echo "📋 Using filenames: CODE_FILENAME=$CODE_FILENAME, TEST_FILENAME=$TEST_FILENAME"
+            echo "🔍 Debug: CODE_CONTENT length: ${#CODE_CONTENT}"
+            echo "🔍 Debug: TEST_CONTENT length: ${#TEST_CONTENT}"
             
             # Create the code file from pipeline parameters
             if [ -n "$CODE_CONTENT" ]; then
-              echo "$CODE_CONTENT" | base64 -d > "$CODE_FILENAME"
-              echo "✅ Created code file: $CODE_FILENAME"
-              echo "📄 Code file contents:"
-              cat "$CODE_FILENAME"
+              echo "🔍 Attempting to decode CODE_CONTENT..."
+              if echo "$CODE_CONTENT" | base64 -d > "$CODE_FILENAME" 2>/dev/null; then
+                echo "✅ Created code file: $CODE_FILENAME"
+                echo "📄 Code file contents:"
+                cat "$CODE_FILENAME"
+              else
+                echo "❌ Failed to decode CODE_CONTENT - invalid base64"
+                echo "🔍 CODE_CONTENT preview: ${CODE_CONTENT:0:50}..."
+                exit 1
+              fi
             else
               echo "⚠️ No CODE_CONTENT provided - cannot create code file"
               echo "❌ Pipeline will fail - code content is required"
@@ -50,14 +106,20 @@ jobs:
             
             # Create the test file from pipeline parameters  
             if [ -n "$TEST_CONTENT" ]; then
-              echo "$TEST_CONTENT" | base64 -d > "$TEST_FILENAME"
-              echo "✅ Created test file: $TEST_FILENAME"
-              echo "📄 Test file contents:"
-              cat "$TEST_FILENAME"
+              echo "🔍 Attempting to decode TEST_CONTENT..."
+              if echo "$TEST_CONTENT" | base64 -d > "$TEST_FILENAME" 2>/dev/null; then
+                echo "✅ Created test file: $TEST_FILENAME"
+                echo "📄 Test file contents:"
+                cat "$TEST_FILENAME"
+              else
+                echo "❌ Failed to decode TEST_CONTENT - invalid base64"
+                echo "🔍 TEST_CONTENT preview: ${TEST_CONTENT:0:50}..."
+                exit 1
+              fi
             else
               echo "⚠️ No TEST_CONTENT provided - creating basic test file"
               # Create a basic test file that imports the code
-              cat > "$TEST_FILENAME" << EOF
+              cat > "$TEST_FILENAME" << 'EOF'
 import pytest
 import sys
 import os
@@ -95,6 +157,19 @@ EOF
             echo "🔍 Files created in current directory:"
             ls -la *.py
             
+            # Validate that files were created
+            if [ ! -f "$CODE_FILENAME" ]; then
+              echo "❌ Code file $CODE_FILENAME was not created"
+              exit 1
+            fi
+            
+            if [ ! -f "$TEST_FILENAME" ]; then
+              echo "❌ Test file $TEST_FILENAME was not created"
+              exit 1
+            fi
+            
+            echo "✅ All files created successfully"
+            
             # Export variables for next steps
             echo "CODE_FILENAME=$CODE_FILENAME" >> $BASH_ENV
             echo "TEST_FILENAME=$TEST_FILENAME" >> $BASH_ENV
@@ -119,4 +194,7 @@ workflows:
   version: 2
   main:
     jobs:
-      - test
+      - test:
+          filters:
+            branches:
+              only: main
