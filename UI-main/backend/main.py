@@ -132,8 +132,38 @@ def remove_emojis(text):
     return no_emoji.encode('latin-1', 'ignore').decode('latin-1')
 
 def clean_html(html_content):
+    """Clean HTML content and extract only the essential text/code"""
     soup = BeautifulSoup(html_content, "html.parser")
-    return soup.get_text(separator="\n")
+    
+    # Remove script and style elements
+    for script in soup(["script", "style"]):
+        script.decompose()
+    
+    # Try to find code blocks first
+    code_blocks = soup.find_all(['pre', 'code', 'ac:structured-macro'])
+    if code_blocks:
+        # Extract text from code blocks
+        code_texts = []
+        for block in code_blocks:
+            text = block.get_text().strip()
+            if text:
+                code_texts.append(text)
+        
+        if code_texts:
+            return '\n\n'.join(code_texts)
+    
+    # If no code blocks, get all text but limit it
+    text = soup.get_text(separator="\n")
+    
+    # Remove excessive whitespace
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    text = '\n'.join(lines)
+    
+    # Limit to reasonable size for CircleCI
+    if len(text) > 2000:
+        text = text[:2000] + "\n\n# ... Content truncated (original was too large)"
+    
+    return text
 
 def init_confluence():
     try:
@@ -801,23 +831,47 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
         if code_content:
             import base64
             
-            # Check content size limits for CircleCI parameters (512 chars max)
-            code_b64 = base64.b64encode(code_content.encode()).decode()
+            # Function to truncate content to fit CircleCI limits
+            def truncate_for_circleci(content, max_chars=350):
+                """Truncate content to fit within CircleCI parameter limits"""
+                if len(content) <= max_chars:
+                    return content
+                
+                # For very large content, be more aggressive
+                if len(content) > 1000:
+                    max_chars = 250  # Even more conservative for very large files
+                
+                # Try to truncate at a logical point (end of line, function, etc.)
+                truncated = content[:max_chars]
+                
+                # Try to find a good truncation point
+                for separator in ['\n\n', '\n', ';', ' ']:
+                    last_sep = truncated.rfind(separator)
+                    if last_sep > max_chars * 0.8:  # At least 80% of max length
+                        truncated = truncated[:last_sep + len(separator)]
+                        break
+                
+                # Add truncation indicator
+                truncated += f"\n\n# ... Content truncated for CircleCI (original: {len(content)} chars)"
+                return truncated
             
-            print(f"🔍 DEBUG: Code content size: {len(code_content)} chars")
+            # Truncate code content if needed
+            truncated_code = truncate_for_circleci(code_content)
+            code_b64 = base64.b64encode(truncated_code.encode()).decode()
+            
+            print(f"🔍 DEBUG: Original code content size: {len(code_content)} chars")
+            print(f"🔍 DEBUG: Truncated code content size: {len(truncated_code)} chars")
             print(f"🔍 DEBUG: Code base64 size: {len(code_b64)} chars")
             
-            # Check if code content is too large for CircleCI parameters
-            if len(code_b64) > 500:  # Leave some buffer for CircleCI's 512 limit
-                print(f"⚠️ Code content too large for CircleCI parameters")
-                print(f"📄 Code content size: {len(code_b64)} chars")
+            # Final safety check
+            if len(code_b64) > 450:  # Leave more buffer for CircleCI's 512 limit
+                print(f"⚠️ Code content still too large after truncation")
+                print(f"📄 Code base64 size: {len(code_b64)} chars")
                 print(f"📋 CircleCI limit: 512 chars per parameter")
-                print(f"💡 Suggestion: Use smaller code files or split your content")
-                print(f"🔄 Cannot proceed - content too large for CircleCI")
                 
                 return {
                     "success": False,
-                    "error": f"Code content too large for CircleCI parameters. Code: {len(code_b64)} chars. CircleCI limit: 512 chars per parameter. Please use smaller files or split your content.",
+                    "error": f"Code content too large for CircleCI parameters even after truncation. Code: {len(code_b64)} chars. CircleCI limit: 512 chars per parameter. Please use much smaller files.",
                     "setup_required": False
                 }
             
@@ -829,20 +883,26 @@ def trigger_circleci_pipeline(branch="main", parameters=None, code_content=None,
             
             # Add test content if available
             if test_content:
-                test_b64 = base64.b64encode(test_content.encode()).decode()
-                print(f"🔍 DEBUG: Test content size: {len(test_content)} chars")
+                # Estimate base64 size before encoding
+                estimated_b64_size = int(len(test_content) * 1.37)  # Base64 is ~37% larger
+                print(f"🔍 DEBUG: Estimated test base64 size: {estimated_b64_size} chars")
+                
+                # Truncate test content if needed
+                truncated_test = truncate_for_circleci(test_content)
+                test_b64 = base64.b64encode(truncated_test.encode()).decode()
+                
+                print(f"🔍 DEBUG: Original test content size: {len(test_content)} chars")
+                print(f"🔍 DEBUG: Truncated test content size: {len(truncated_test)} chars")
                 print(f"🔍 DEBUG: Test base64 size: {len(test_b64)} chars")
                 
-                if len(test_b64) > 500:  # Leave some buffer for CircleCI's 512 limit
-                    print(f"⚠️ Test content too large for CircleCI parameters")
-                    print(f"🧪 Test content size: {len(test_b64)} chars")
+                if len(test_b64) > 450:  # More conservative buffer for CircleCI's 512 limit
+                    print(f"⚠️ Test content still too large after truncation")
+                    print(f"🧪 Test base64 size: {len(test_b64)} chars")
                     print(f"📋 CircleCI limit: 512 chars per parameter")
-                    print(f"💡 Suggestion: Use smaller test files or split your content")
-                    print(f"🔄 Cannot proceed - test content too large for CircleCI")
                     
                     return {
                         "success": False,
-                        "error": f"Test content too large for CircleCI parameters. Test: {len(test_b64)} chars. CircleCI limit: 512 chars per parameter. Please use smaller files or split your content.",
+                        "error": f"Test content too large for CircleCI parameters even after truncation. Test: {len(test_b64)} chars. CircleCI limit: 512 chars per parameter. Please use much smaller files.",
                         "setup_required": False
                     }
                 
@@ -1150,6 +1210,31 @@ def test_basic():
         else:
             print(f"🧪 No test content available")
         
+        # Early size check to prevent CircleCI issues
+        def estimate_base64_size(content):
+            """Estimate base64 size of content"""
+            if not content:
+                return 0
+            # Base64 encoding increases size by ~33%
+            return int(len(content) * 1.4)
+        
+        code_b64_estimate = estimate_base64_size(clean_code_content)
+        test_b64_estimate = estimate_base64_size(clean_test_content)
+        
+        print(f"🔍 Estimated base64 sizes - Code: {code_b64_estimate} chars, Test: {test_b64_estimate} chars")
+        
+        # If content is too large, truncate it before sending to CircleCI
+        if code_b64_estimate > 400:  # More conservative buffer for CircleCI's 512 limit
+            print(f"⚠️ Code content too large for CircleCI, truncating...")
+            # Truncate to ~250 chars to account for base64 expansion
+            clean_code_content = clean_code_content[:250] + "\n\n# ... Content truncated for CircleCI compatibility"
+            print(f"📄 Truncated code content length: {len(clean_code_content)}")
+        
+        if test_b64_estimate > 400:
+            print(f"⚠️ Test content too large for CircleCI, truncating...")
+            clean_test_content = clean_test_content[:250] + "\n\n# ... Content truncated for CircleCI compatibility"
+            print(f"🧪 Truncated test content length: {len(clean_test_content)}")
+        
         circleci_result = trigger_circleci_pipeline(
             branch="main",
             code_content=clean_code_content,
@@ -1161,6 +1246,8 @@ def test_basic():
         if not circleci_result['success']:
             print(f"⚠️ CircleCI trigger failed: {circleci_result['error']}")
             # Continue with AI generation even if CircleCI fails
+            # Add a note about the CircleCI failure to the response
+            circleci_result['note'] = "CircleCI integration failed, but AI analysis continues"
         
         # Generate test strategy
         prompt_strategy = f"""The following is a code snippet:\n\n{code_content[:2000]}\n\nPlease generate a **structured test strategy** for the above code using the following format. 
@@ -1303,6 +1390,19 @@ Provide specific examples and code snippets for each category."""
             "sensitivity": sensitivity_content,
             "circleci_trigger": circleci_result
         }
+        
+        # Add helpful guidance if CircleCI failed due to size issues
+        if not circleci_result.get('success') and 'too large' in circleci_result.get('error', ''):
+            result['guidance'] = {
+                'message': 'CircleCI integration failed due to content size limits',
+                'suggestions': [
+                    'Use smaller code files or snippets',
+                    'Split large files into smaller components',
+                    'Remove unnecessary comments or whitespace',
+                    'Focus on the core functionality for testing'
+                ],
+                'note': 'AI analysis completed successfully despite CircleCI failure'
+            }
         
         # Log the complete operation
         print(f"✅ Test strategy generation completed:")
