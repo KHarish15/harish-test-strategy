@@ -38,40 +38,38 @@ jobs:
               echo "✅ Found run_dynamic_tests.py"
             else
               echo "⚠️ run_dynamic_tests.py not found - creating basic version"
-              cat > run_dynamic_tests.py << 'EOF'
-import subprocess
-import re
-import sys
-import os
-
-def run_pytest_and_parse():
-    test_filename = os.getenv('TEST_FILENAME', 'input_file.py')
-    print(f"🔍 Looking for tests in: {test_filename}")
-    
-    result = subprocess.run(
-        ['pytest', test_filename, '--tb=short', '-q'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
-    output = result.stdout
-
-    passed = failed = 0
-    summary_match = re.search(r'(\d+) passed', output)
-    if summary_match:
-        passed = int(summary_match.group(1))
-    failed_match = re.search(r'(\d+) failed', output)
-    if failed_match:
-        failed = int(failed_match.group(1))
-    total = passed + failed
-
-    print(f"No of test cases: {total}")
-    print(f"No of test cases passed: {passed}")
-    print(f"No of test cases failed: {failed}")
-
-if __name__ == "__main__":
-    run_pytest_and_parse()
-EOF
+              echo 'import subprocess' > run_dynamic_tests.py
+              echo 'import re' >> run_dynamic_tests.py
+              echo 'import sys' >> run_dynamic_tests.py
+              echo 'import os' >> run_dynamic_tests.py
+              echo '' >> run_dynamic_tests.py
+              echo 'def run_pytest_and_parse():' >> run_dynamic_tests.py
+              echo '    test_filename = os.getenv("TEST_FILENAME", "input_file.py")' >> run_dynamic_tests.py
+              echo "    print(f\"🔍 Looking for tests in: {test_filename}\")" >> run_dynamic_tests.py
+              echo '' >> run_dynamic_tests.py
+              echo '    result = subprocess.run(' >> run_dynamic_tests.py
+              echo '        ["pytest", test_filename, "--tb=short", "-q"],' >> run_dynamic_tests.py
+              echo '        stdout=subprocess.PIPE,' >> run_dynamic_tests.py
+              echo '        stderr=subprocess.STDOUT,' >> run_dynamic_tests.py
+              echo '        text=True' >> run_dynamic_tests.py
+              echo '    )' >> run_dynamic_tests.py
+              echo '    output = result.stdout' >> run_dynamic_tests.py
+              echo '' >> run_dynamic_tests.py
+              echo '    passed = failed = 0' >> run_dynamic_tests.py
+              echo '    summary_match = re.search(r"(\d+) passed", output)' >> run_dynamic_tests.py
+              echo '    if summary_match:' >> run_dynamic_tests.py
+              echo '        passed = int(summary_match.group(1))' >> run_dynamic_tests.py
+              echo '    failed_match = re.search(r"(\d+) failed", output)' >> run_dynamic_tests.py
+              echo '    if failed_match:' >> run_dynamic_tests.py
+              echo '        failed = int(failed_match.group(1))' >> run_dynamic_tests.py
+              echo '    total = passed + failed' >> run_dynamic_tests.py
+              echo '' >> run_dynamic_tests.py
+              echo "    print(f\"No of test cases: {total}\")" >> run_dynamic_tests.py
+              echo "    print(f\"No of test cases passed: {passed}\")" >> run_dynamic_tests.py
+              echo "    print(f\"No of test cases failed: {failed}\")" >> run_dynamic_tests.py
+              echo '' >> run_dynamic_tests.py
+              echo 'if __name__ == "__main__":' >> run_dynamic_tests.py
+              echo '    run_pytest_and_parse()' >> run_dynamic_tests.py
             fi
       - run:
           name: Create uploaded files
@@ -119,35 +117,33 @@ EOF
             else
               echo "⚠️ No TEST_CONTENT provided - creating basic test file"
               # Create a basic test file that imports the code
-              cat > "$TEST_FILENAME" << 'EOF'
-import pytest
-import sys
-import os
-
-# Add the current directory to Python path
-sys.path.insert(0, os.getcwd())
-
-# Import the code file (without .py extension)
-code_module = "$CODE_FILENAME".replace('.py', '')
-try:
-    exec(f"import {code_module}")
-    print(f"✅ Successfully imported {code_module}")
-except Exception as e:
-    print(f"⚠️ Could not import {code_module}: {e}")
-
-def test_basic():
-    """Basic test to verify the code can be imported and executed"""
-    assert True
-    print("✅ Basic test passed")
-
-def test_code_import():
-    """Test that the code file can be imported"""
-    try:
-        exec(f"import {code_module}")
-        assert True
-    except Exception as e:
-        assert False, f"Failed to import {code_module}: {e}"
-EOF
+              echo 'import pytest' > "$TEST_FILENAME"
+              echo 'import sys' >> "$TEST_FILENAME"
+              echo 'import os' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '# Add the current directory to Python path' >> "$TEST_FILENAME"
+              echo 'sys.path.insert(0, os.getcwd())' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo '# Import the code file (without .py extension)' >> "$TEST_FILENAME"
+              echo 'code_module = "$CODE_FILENAME".replace(".py", "")' >> "$TEST_FILENAME"
+              echo 'try:' >> "$TEST_FILENAME"
+              echo "    exec(f\"import {code_module}\")" >> "$TEST_FILENAME"
+              echo "    print(f\"✅ Successfully imported {code_module}\")" >> "$TEST_FILENAME"
+              echo 'except Exception as e:' >> "$TEST_FILENAME"
+              echo "    print(f\"⚠️ Could not import {code_module}: {e}\")" >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo 'def test_basic():' >> "$TEST_FILENAME"
+              echo '    """Basic test to verify the code can be imported and executed"""' >> "$TEST_FILENAME"
+              echo '    assert True' >> "$TEST_FILENAME"
+              echo '    print("✅ Basic test passed")' >> "$TEST_FILENAME"
+              echo '' >> "$TEST_FILENAME"
+              echo 'def test_code_import():' >> "$TEST_FILENAME"
+              echo '    """Test that the code file can be imported"""' >> "$TEST_FILENAME"
+              echo '    try:' >> "$TEST_FILENAME"
+              echo "        exec(f\"import {code_module}\")" >> "$TEST_FILENAME"
+              echo '        assert True' >> "$TEST_FILENAME"
+              echo '    except Exception as e:' >> "$TEST_FILENAME"
+              echo "        assert False, f\"Failed to import {code_module}: {e}\"" >> "$TEST_FILENAME"
               echo "✅ Created basic test file: $TEST_FILENAME"
               echo "📄 Test file contents:"
               cat "$TEST_FILENAME"
