@@ -131,46 +131,16 @@ jobs:
                 echo "🔍 Note: Your test file should import functions from the code file"
                 echo "🔍 If your test uses 'from main import ...', it will be updated automatically"
                 
-                # Validate syntax of the original decoded test file
-                echo "🔍 Validating syntax of original test file..."
-                if python3 -m py_compile "$TEST_FILENAME"; then
-                  echo "✅ Original syntax check passed"
-                else
-                  echo "❌ Original test file has syntax error (likely indentation)"
-                  echo "⚠️ Overwriting broken test file with fallback"
-                  rm "$TEST_FILENAME"
-                  unset TEST_CONTENT
-                fi
-                
                 # Update import statement to match the actual code filename
-                if [ -f "$TEST_FILENAME" ]; then
-                  echo "🔍 Updating import statement to match code filename..."
-                  code_module_name=$(echo "$CODE_FILENAME" | sed 's/\.py$//' | sed 's/ /_/g')
-                  sed -i "s/from main import/from $code_module_name import/g" "$TEST_FILENAME"
-                else
-                  echo "⚠️ Test file was removed due to syntax error - skipping import update"
-                fi
+                echo "🔍 Updating import statement to match code filename..."
+                code_module_name=$(echo "$CODE_FILENAME" | sed 's/\.py$//' | sed 's/ /_/g')
+                sed -i "s/from main import/from $code_module_name import/g" "$TEST_FILENAME"
                 echo "🔍 Updated imports to use: $code_module_name"
                 echo "📄 Updated test file contents:"
                 cat "$TEST_FILENAME"
                 echo ""
                 echo "🔍 File size after update: $(wc -c < "$TEST_FILENAME") bytes"
                 echo "🔍 File exists and has content: $([ -f "$TEST_FILENAME" ] && [ -s "$TEST_FILENAME" ] && echo "YES" || echo "NO")"
-                
-                # Validate syntax of the updated test file
-                if [ -f "$TEST_FILENAME" ]; then
-                  echo "🔍 Validating syntax of updated test file..."
-                  if python3 -m py_compile "$TEST_FILENAME"; then
-                    echo "✅ Syntax check passed - using your test file"
-                  else
-                    echo "❌ Test file has syntax error after import update"
-                    echo "⚠️ Overwriting broken test file with fallback"
-                    rm "$TEST_FILENAME"
-                    unset TEST_CONTENT
-                  fi
-                else
-                  echo "⚠️ Test file was already removed - proceeding to fallback"
-                fi
               else
                 echo "❌ Failed to decode TEST_CONTENT - invalid base64"
                 echo "🔍 TEST_CONTENT preview: ${TEST_CONTENT:0:50}..."
